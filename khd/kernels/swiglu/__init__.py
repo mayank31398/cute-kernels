@@ -33,10 +33,10 @@ class _Swiglu_KHD(torch.autograd.Function):
         ctx,
         gate: torch.Tensor,
         up: torch.Tensor,
-        kernel_backend_forward: KernelBackend | CutoTuneParameter = CutoTuneParameter(),
-        kernel_backend_backward: KernelBackend | CutoTuneParameter = CutoTuneParameter(),
-        BLOCK_SIZE_forward: int | CutoTuneParameter = CutoTuneParameter(),
-        BLOCK_SIZE_backward: int | CutoTuneParameter = CutoTuneParameter(),
+        kernel_backend_forward: KernelBackend | CutoTuneParameter,
+        kernel_backend_backward: KernelBackend | CutoTuneParameter,
+        BLOCK_SIZE_forward: int | CutoTuneParameter,
+        BLOCK_SIZE_backward: int | CutoTuneParameter,
     ) -> torch.Tensor:
         assert gate.size() == up.size(), "tensors gate and up should have same shape"
         assert gate.type() == up.type(), "tensors gate and up should have same dtype"
