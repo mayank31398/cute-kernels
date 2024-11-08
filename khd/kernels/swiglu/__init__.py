@@ -27,7 +27,7 @@ class _Swiglu_KHD(torch.autograd.Function):
             if torch.cuda.is_available()
             else []
         ),
-        triggers={"x.dtype"},
+        triggers={"gate.dtype"},
     )
     def forward(
         ctx,
