@@ -75,13 +75,15 @@ class _Swiglu_KHD(torch.autograd.Function):
         return output
 
     def backward(ctx, output_grad: torch.Tensor) -> tuple[torch.Tensor | None]:
-        return _Swiglu_KHD._backward(
+        gate_grad, up_grad = _Swiglu_KHD._backward(
             output_grad=output_grad,
             gate=ctx.gate,
             up=ctx.up,
             kernel_backend_backward=ctx.kernel_backend_backward,
             BLOCK_SIZE_backward=ctx.BLOCK_SIZE_backward,
         )
+
+        return gate_grad, up_grad, None, None, None
 
     @staticmethod
     @cutotune(
@@ -101,7 +103,7 @@ class _Swiglu_KHD(torch.autograd.Function):
         up: torch.Tensor,
         kernel_backend_backward: KernelBackend | CutoTuneParameter,
         BLOCK_SIZE_backward: int | CutoTuneParameter,
-    ) -> tuple[torch.Tensor | None]:
+    ) -> tuple[torch.Tensor]:
         gate_grad = torch.empty_like(gate)
         up_grad = torch.empty_like(up)
 
@@ -141,7 +143,7 @@ class _Swiglu_KHD(torch.autograd.Function):
         else:
             raise ValueError(f"unexpected kernel_backend_backward ({kernel_backend_backward})")
 
-        return gate_grad, up_grad, None, None, None, None
+        return gate_grad, up_grad
 
 
 def swiglu_khd(
