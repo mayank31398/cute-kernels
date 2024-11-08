@@ -33,10 +33,10 @@ class _Swiglu_KHD(torch.autograd.Function):
         ctx,
         gate: torch.Tensor,
         up: torch.Tensor,
-        kernel_backend_forward: KernelBackend | CutoTuneParameter,
-        kernel_backend_backward: KernelBackend | CutoTuneParameter,
-        BLOCK_SIZE_forward: int | CutoTuneParameter,
-        BLOCK_SIZE_backward: int | CutoTuneParameter,
+        kernel_backend_forward: KernelBackend | CutoTuneParameter = CutoTuneParameter(),
+        kernel_backend_backward: KernelBackend | CutoTuneParameter = CutoTuneParameter(),
+        BLOCK_SIZE_forward: int | CutoTuneParameter = CutoTuneParameter(),
+        BLOCK_SIZE_backward: int | CutoTuneParameter = CutoTuneParameter(),
     ) -> torch.Tensor:
         assert gate.size() == up.size(), "tensors gate and up should have same shape"
         assert gate.type() == up.type(), "tensors gate and up should have same dtype"
@@ -74,12 +74,34 @@ class _Swiglu_KHD(torch.autograd.Function):
 
         return output
 
-    @staticmethod
     def backward(ctx, output_grad: torch.Tensor) -> tuple[torch.Tensor | None]:
-        gate, up = ctx.saved_tensors
-        BLOCK_SIZE_backward = ctx.BLOCK_SIZE_backward
-        kernel_backend_backward = ctx.kernel_backend_backward
+        return _Swiglu_KHD._backward(
+            output_grad=output_grad,
+            gate=ctx.gate,
+            up=ctx.up,
+            kernel_backend_backward=ctx.kernel_backend_backward,
+            BLOCK_SIZE_backward=ctx.BLOCK_SIZE_backward,
+        )
 
+    @staticmethod
+    @cutotune(
+        configs=(
+            get_cartesian_product_cutotune_configs(
+                kernel_backend_backward=[KernelBackend.cuda, KernelBackend.triton],
+                BLOCK_SIZE_backward=BLOCK_SIZES_POWERS_OF_2,
+            )
+            if torch.cuda.is_available()
+            else []
+        ),
+        triggers={"gate.dtype"},
+    )
+    def _backward(
+        output_grad: torch.Tensor,
+        gate: torch.Tensor,
+        up: torch.Tensor,
+        kernel_backend_backward: KernelBackend | CutoTuneParameter,
+        BLOCK_SIZE_backward: int | CutoTuneParameter,
+    ) -> tuple[torch.Tensor | None]:
         gate_grad = torch.empty_like(gate)
         up_grad = torch.empty_like(up)
 
