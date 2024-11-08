@@ -1,8 +1,9 @@
 import torch
 import triton
 
+from ...constants import BLOCK_SIZES_POWERS_OF_2
 from ...enums import KernelBackend
-from ...utils import ensure_same_strides
+from ...utils import CutoTuneParameter, cutotune, ensure_same_strides, get_cartesian_product_cutotune_configs
 from .cuda_implementation import (
     swiglu_backward_cuda_kernel,
     swiglu_backward_cuda_kernel_compileable,
@@ -15,14 +16,27 @@ from .triton_implementation import swiglu_backward_triton_kernel, swiglu_forward
 
 class _Swiglu_KHD(torch.autograd.Function):
     @staticmethod
+    @cutotune(
+        configs=(
+            get_cartesian_product_cutotune_configs(
+                kernel_backend_forward=[KernelBackend.cuda, KernelBackend.triton],
+                kernel_backend_backward=[KernelBackend.cuda, KernelBackend.triton],
+                BLOCK_SIZE_forward=BLOCK_SIZES_POWERS_OF_2,
+                BLOCK_SIZE_backward=BLOCK_SIZES_POWERS_OF_2,
+            )
+            if torch.cuda.is_available()
+            else []
+        ),
+        triggers={"x.dtype"},
+    )
     def forward(
         ctx,
         gate: torch.Tensor,
         up: torch.Tensor,
-        kernel_backend_forward: KernelBackend,
-        kernel_backend_backward: KernelBackend,
-        BLOCK_SIZE_forward: int,
-        BLOCK_SIZE_backward: int,
+        kernel_backend_forward: KernelBackend | CutoTuneParameter,
+        kernel_backend_backward: KernelBackend | CutoTuneParameter,
+        BLOCK_SIZE_forward: int | CutoTuneParameter,
+        BLOCK_SIZE_backward: int | CutoTuneParameter,
     ) -> torch.Tensor:
         assert gate.size() == up.size(), "tensors gate and up should have same shape"
         assert gate.type() == up.type(), "tensors gate and up should have same dtype"
@@ -111,10 +125,10 @@ class _Swiglu_KHD(torch.autograd.Function):
 def swiglu_khd(
     gate: torch.Tensor,
     up: torch.Tensor,
-    kernel_backend_forward: KernelBackend,
-    kernel_backend_backward: KernelBackend,
-    BLOCK_SIZE_forward: int,
-    BLOCK_SIZE_backward: int,
+    kernel_backend_forward: KernelBackend | CutoTuneParameter = CutoTuneParameter(),
+    kernel_backend_backward: KernelBackend | CutoTuneParameter = CutoTuneParameter(),
+    BLOCK_SIZE_forward: int | CutoTuneParameter = CutoTuneParameter(),
+    BLOCK_SIZE_backward: int | CutoTuneParameter = CutoTuneParameter(),
 ) -> torch.Tensor:
     return _Swiglu_KHD.apply(
         gate, up, kernel_backend_forward, kernel_backend_backward, BLOCK_SIZE_forward, BLOCK_SIZE_backward
