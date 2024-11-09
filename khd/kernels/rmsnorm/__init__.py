@@ -41,24 +41,24 @@ class _RMSNorm_KHD(torch.autograd.Function):
         hidden_size = x.size(-1)
         num_elements = x.numel() // hidden_size
 
-        original_shape = x.size()
-        x = x.view(-1, hidden_size)
-
         output = torch.empty_like(x)
+
+        x_view = x.view(-1, hidden_size)
+        output_view = output.view(-1, hidden_size)
 
         if kernel_backend == KernelBackend.triton:
             grid = lambda meta: (triton.cdiv(num_elements, meta["BLOCK_SIZE_B"]),)
 
             with torch.device(x.device):
                 rmsnorm_forward_triton_kernel[grid](
-                    x_ptr=x,
-                    x_stride_b=x.stride(0),
-                    x_stride_h=x.stride(1),
+                    x_ptr=x_view,
+                    x_stride_b=x_view.stride(0),
+                    x_stride_h=x_view.stride(1),
                     has_weight=weight is not None,
                     weight_ptr=weight,
-                    output_ptr=output,
-                    output_stride_b=output.stride(0),
-                    output_stride_h=output.stride(1),
+                    output_ptr=output_view,
+                    output_stride_b=output_view.stride(0),
+                    output_stride_h=output_view.stride(1),
                     eps=eps,
                     B=num_elements,
                     H=hidden_size,
@@ -67,8 +67,6 @@ class _RMSNorm_KHD(torch.autograd.Function):
                 )
         else:
             raise ValueError(f"unexpected kernel_backend ({kernel_backend})")
-
-        output = output.view(original_shape)
 
         return output
 

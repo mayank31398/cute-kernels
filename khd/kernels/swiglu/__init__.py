@@ -20,9 +20,7 @@ class _Swiglu_KHD(torch.autograd.Function):
         configs=(
             get_cartesian_product_cutotune_configs(
                 kernel_backend_forward=[KernelBackend.cuda, KernelBackend.triton],
-                kernel_backend_backward=[KernelBackend.cuda, KernelBackend.triton],
                 BLOCK_SIZE_forward=BLOCK_SIZES_POWERS_OF_2,
-                BLOCK_SIZE_backward=BLOCK_SIZES_POWERS_OF_2,
             )
             if torch.cuda.is_available()
             else []
