@@ -74,6 +74,7 @@ class _Swiglu_KHD(torch.autograd.Function):
 
         return output
 
+    @staticmethod
     def backward(ctx, output_grad: torch.Tensor) -> tuple[torch.Tensor | None]:
         gate_grad, up_grad = _Swiglu_KHD._backward(
             output_grad=output_grad,
