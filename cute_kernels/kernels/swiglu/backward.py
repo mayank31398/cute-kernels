@@ -3,7 +3,7 @@ import triton
 
 from ...constants import CUDA_BLOCK_SIZES_POWERS_OF_2, TRITON_BLOCK_SIZES_POWERS_OF_2
 from ...enums import KernelBackend
-from ...utils import cutotune, get_cartesian_product_cutotune_configs
+from ...utils import ceil_divide, cutotune, get_cartesian_product_cutotune_configs
 from .cuda_implementation import swiglu_backward_cuda_kernel, swiglu_backward_cuda_kernel_compileable
 from .triton_implementation import swiglu_backward_triton_kernel
 
@@ -69,10 +69,9 @@ def _backward(
             )
     elif kernel_backend == KernelBackend.triton:
         num_elements = gate.numel()
-        grid = lambda meta: (triton.cdiv(num_elements, meta["BLOCK_SIZE"]),)
 
         with torch.device(gate.device):
-            swiglu_backward_triton_kernel[grid](
+            swiglu_backward_triton_kernel[ceil_divide(num_elements, BLOCK_SIZE),](
                 gate_ptr=gate,
                 up_ptr=up,
                 output_grad_ptr=output_grad,

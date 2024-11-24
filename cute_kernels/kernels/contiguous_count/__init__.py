@@ -15,9 +15,9 @@ def contiguous_count_cute(
     BLOCK_SIZE_B: int = 64,
 ) -> torch.Tensor:
     assert x.dim() == 1, "x should be 1-dimensional"
-    x = x.contiguous()
-
     assert x.dtype in [torch.int32, torch.long]
+
+    x = x.contiguous()
 
     B = x.numel()
     C = end - start

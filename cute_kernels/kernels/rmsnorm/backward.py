@@ -3,7 +3,7 @@ import triton
 
 from ...constants import MAX_TRITON_BLOCK_SIZE, TORCH_TO_TRITON_DTYPE, TRITON_BLOCK_SIZES_POWERS_OF_2
 from ...enums import KernelBackend
-from ...utils import CutoTuneConfig, CutoTuneParameter, cutotune, ensure_same_strides, get_sm_count
+from ...utils import CutoTuneConfig, CutoTuneParameter, ceil_divide, cutotune, ensure_same_strides, get_sm_count
 from .triton_implementation import rmsnorm_backward_triton_kernel
 
 
@@ -25,22 +25,26 @@ def _triton_backward(
     output_grad: torch.Tensor,
     rmsnorm_denominator: torch.Tensor,
     x_grad: torch.Tensor,
-    weight_grad: torch.Tensor,
     eps: float,
     memory_efficient: bool,
     BLOCK_SIZE_B: int,
     BLOCK_SIZE_H: int,
-) -> None:
+) -> torch.Tensor | None:
     num_elements, hidden_size = x_view.size()
 
     if BLOCK_SIZE_H < hidden_size:
         raise ValueError(f"hidden_size should be more than the BLOCK_SIZE_H")
 
     sm_count = get_sm_count(x_view.device)
-    grid = (1,)
+    num_programs = min(sm_count, ceil_divide(num_elements, BLOCK_SIZE_B))
+
+    has_weight = weight is not None
+    weight_grad = (
+        torch.empty(num_programs, hidden_size, device=x_grad.device, dtype=torch.float32) if has_weight else None
+    )
 
     with torch.device(x_view.device):
-        rmsnorm_backward_triton_kernel[grid](
+        rmsnorm_backward_triton_kernel[(num_programs,)](
             x_ptr=x_view,
             x_stride_b=x_view.stride(0),
             x_stride_h=x_view.stride(1),
@@ -52,6 +56,8 @@ def _triton_backward(
             output_grad_stride_h=output_grad.stride(1),
             x_grad_ptr=x_grad,
             weight_grad_ptr=weight_grad,
+            weight_grad_stride_b=weight_grad.stride(0) if has_weight else None,
+            weight_grad_stride_h=weight_grad.stride(1) if has_weight else None,
             eps=eps,
             memory_efficient=memory_efficient,
             rmsnorm_denominator_ptr=rmsnorm_denominator,
@@ -60,6 +66,11 @@ def _triton_backward(
             BLOCK_SIZE_B=BLOCK_SIZE_B,
             BLOCK_SIZE_H=BLOCK_SIZE_H,
         )
+
+    if has_weight:
+        weight_grad = weight_grad.sum(dim=0).type_as(weight)
+
+    return weight_grad
 
 
 @cutotune(configs=[CutoTuneConfig(config={"kernel_backend": KernelBackend.triton})], triggers={"x.dtype"})
@@ -77,27 +88,24 @@ def _backward(
     # x already has stride(-1) = 1 from the forward function
     # so we just ensure that x & output_grad have the same strides
     x, output_grad = ensure_same_strides(x, output_grad)
-
-    has_weight = weight is not None
     hidden_size = x.size(-1)
 
     x_grad = torch.empty_like(x)
-    weight_grad = torch.empty(hidden_size, device=x.device, dtype=x.dtype) if has_weight else None
 
     x_view = x.view(-1, hidden_size)
     output_grad_view = output_grad.view(-1, hidden_size)
 
     if kernel_backend == KernelBackend.triton:
+        # NOTE we ignore the BLOCK_SIZE_H passed by user
         BLOCK_SIZE_H = triton.next_power_of_2(hidden_size)
         assert BLOCK_SIZE_H <= MAX_TRITON_BLOCK_SIZE
 
-        _triton_backward(
+        weight_grad = _triton_backward(
             x_view=x_view,
             weight=weight,
             output_grad=output_grad_view,
             rmsnorm_denominator=rmsnorm_denominator,
             x_grad=x_grad,
-            weight_grad=weight_grad,
             eps=eps,
             memory_efficient=memory_efficient,
             BLOCK_SIZE_B=BLOCK_SIZE_B,
