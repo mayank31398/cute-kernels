@@ -3,7 +3,7 @@ import triton
 
 from ...constants import CUDA_BLOCK_SIZES_POWERS_OF_2, TRITON_BLOCK_SIZES_POWERS_OF_2
 from ...enums import KernelBackend
-from ...utils import cutotune, ensure_same_strides, get_cartesian_product_cutotune_configs
+from ...utils import ceil_divide, cutotune, ensure_same_strides, get_cartesian_product_cutotune_configs
 from .cuda_implementation import swiglu_forward_cuda_kernel, swiglu_forward_cuda_kernel_compileable
 from .triton_implementation import swiglu_forward_triton_kernel
 
@@ -66,10 +66,9 @@ def _forward(
             )
     elif kernel_backend == KernelBackend.triton:
         num_elements = gate.numel()
-        grid = lambda meta: (triton.cdiv(num_elements, meta["BLOCK_SIZE"]),)
 
         with torch.device(gate.device):
-            swiglu_forward_triton_kernel[grid](
+            swiglu_forward_triton_kernel[(ceil_divide(num_elements, BLOCK_SIZE),)](
                 gate_ptr=gate,
                 up_ptr=up,
                 output_ptr=output,

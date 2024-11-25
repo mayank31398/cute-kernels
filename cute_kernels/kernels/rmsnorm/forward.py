@@ -3,7 +3,7 @@ import triton
 
 from ...constants import MAX_TRITON_BLOCK_SIZE, TORCH_TO_TRITON_DTYPE, TRITON_BLOCK_SIZES_POWERS_OF_2
 from ...enums import KernelBackend
-from ...utils import CutoTuneConfig, CutoTuneParameter, cutotune
+from ...utils import CutoTuneConfig, CutoTuneParameter, ceil_divide, cutotune
 from .triton_implementation import rmsnorm_forward_triton_kernel
 
 
@@ -34,10 +34,8 @@ def _triton_forward(
     if BLOCK_SIZE_H < hidden_size:
         raise ValueError(f"hidden_size should be more than the BLOCK_SIZE_H")
 
-    grid = lambda meta: (triton.cdiv(num_elements, meta["BLOCK_SIZE_B"]),)
-
     with torch.device(x_view.device):
-        rmsnorm_forward_triton_kernel[grid](
+        rmsnorm_forward_triton_kernel[(ceil_divide(num_elements, BLOCK_SIZE_B),)](
             x_ptr=x_view,
             x_stride_b=x_view.stride(0),
             x_stride_h=x_view.stride(1),
