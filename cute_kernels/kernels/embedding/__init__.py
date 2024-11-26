@@ -1,13 +1,14 @@
 import torch
 
 from ...enums import KernelBackend
-from ...utils import ceil_divide
+from ...utils import ceil_divide, ensure_contiguous
 from .torch_implementation import embedding_torch
 from .triton_implementation import embedding_forward_triton_kernel
 
 
 class _Embedding_Cute(torch.autograd.Function):
     @staticmethod
+    @ensure_contiguous
     def forward(
         ctx,
         input_ids: torch.Tensor,
@@ -18,9 +19,6 @@ class _Embedding_Cute(torch.autograd.Function):
     ) -> torch.Tensor:
         num_elements = input_ids.numel()
         hidden_size = wte.size(-1)
-
-        input_ids = input_ids.contiguous()
-        assert wte.is_contiguous()
 
         output = torch.empty(num_elements, hidden_size, dtype=wte.dtype, device=input_ids.device)
 

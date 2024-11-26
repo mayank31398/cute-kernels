@@ -2,7 +2,7 @@ import torch
 
 from ....constants import CUDA_BLOCK_SIZES_POWERS_OF_2, TRITON_BLOCK_SIZES_POWERS_OF_2
 from ....enums import KernelBackend
-from ....utils import ceil_divide, cutotune, ensure_same_strides, get_cartesian_product_cutotune_configs
+from ....utils import ceil_divide, cutotune, get_cartesian_product_cutotune_configs
 from .cuda_implementation import add_tensor_forward_cuda_kernel, add_tensor_forward_cuda_kernel_compileable
 from .triton_implementation import add_tensor_forward_triton_kernel
 
@@ -41,10 +41,6 @@ def _forward(
     vector_instruction_width: int,
     BLOCK_SIZE: int,
 ) -> torch.Tensor:
-    assert x.size() == y.size(), "tensors x and y should have same shape"
-    assert x.type() == y.type(), "tensors x and y should have same dtype"
-
-    x, y = ensure_same_strides(x, y)
     output = torch.empty_like(x)
 
     if kernel_backend == KernelBackend.cuda:

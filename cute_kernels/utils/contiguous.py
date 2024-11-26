@@ -1,4 +1,4 @@
-from typing import Any
+from typing import Any, Callable
 
 import torch
 
@@ -9,6 +9,15 @@ def is_hip() -> bool:
 
 def make_contiguous(x: Any) -> Any:
     return x.contiguous() if isinstance(x, torch.Tensor) else x
+
+
+def ensure_contiguous(func: Callable) -> Callable:
+    def inner(*args, **kwargs):
+        args = [arg.contiguous() if isinstance(arg, torch.Tensor) else arg for arg in args]
+        kwargs = {k: (v.contiguous() if isinstance(v, torch.Tensor) else v) for k, v in kwargs.items()}
+        return func(*args, **kwargs)
+
+    return inner
 
 
 def ensure_same_strides(*args, force_contiguous: bool = False) -> list[torch.Tensor]:

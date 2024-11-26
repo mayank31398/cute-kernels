@@ -1,9 +1,8 @@
 import torch
-import triton
 
 from ...constants import CUDA_BLOCK_SIZES_POWERS_OF_2, TRITON_BLOCK_SIZES_POWERS_OF_2
 from ...enums import KernelBackend
-from ...utils import ceil_divide, cutotune, ensure_same_strides, get_cartesian_product_cutotune_configs
+from ...utils import ceil_divide, cutotune, get_cartesian_product_cutotune_configs
 from .cuda_implementation import swiglu_forward_cuda_kernel, swiglu_forward_cuda_kernel_compileable
 from .triton_implementation import swiglu_forward_triton_kernel
 
@@ -38,10 +37,6 @@ from .triton_implementation import swiglu_forward_triton_kernel
 def _forward(
     gate: torch.Tensor, up: torch.Tensor, kernel_backend: KernelBackend, vector_instruction_width: int, BLOCK_SIZE: int
 ) -> torch.Tensor:
-    assert gate.size() == up.size(), "tensors gate and up should have same shape"
-    assert gate.type() == up.type(), "tensors gate and up should have same dtype"
-
-    gate, up = ensure_same_strides(gate, up)
     output = torch.empty_like(gate)
 
     if kernel_backend == KernelBackend.cuda:

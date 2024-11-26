@@ -1,7 +1,7 @@
 import torch
 
 from ...enums import KernelBackend
-from ...utils import CutoTuneParameter
+from ...utils import CutoTuneParameter, ensure_contiguous
 from .backward import _backward
 from .forward import _forward
 from .torch_implementation import rmsnorm_torch
@@ -9,6 +9,7 @@ from .torch_implementation import rmsnorm_torch
 
 class _RMSNorm_Cute(torch.autograd.Function):
     @staticmethod
+    @ensure_contiguous
     def forward(
         ctx,
         x: torch.Tensor,
@@ -22,6 +23,18 @@ class _RMSNorm_Cute(torch.autograd.Function):
         BLOCK_SIZE_H_forward: int | CutoTuneParameter,
         BLOCK_SIZE_H_backward: int | CutoTuneParameter,
     ) -> torch.Tensor:
+        assert x.dim() > 1, "x should have more than 1 dimensions"
+
+        if x.stride(-1) != 1:
+            x = x.contiguous()
+
+        if weight is not None:
+            assert weight.dim() == 1, "weight should be 1D"
+            assert weight.size(-1) == x.size(-1), "hidden size for x and weight tensor is different"
+            assert weight.type() == x.type(), "tensors weight and y should have same dtype"
+
+            weight = weight.contiguous()
+
         output, rmsnorm_denominator = _forward(
             x=x,
             weight=weight,
@@ -32,20 +45,18 @@ class _RMSNorm_Cute(torch.autograd.Function):
             BLOCK_SIZE_H=BLOCK_SIZE_H_forward,
         )
 
-        ctx.memory_efficient = memory_efficient
+        ctx.save_for_backward(x, weight, rmsnorm_denominator)
+
         ctx.kernel_backend_backward = kernel_backend_backward
         ctx.eps = eps
         ctx.BLOCK_SIZE_B_backward = BLOCK_SIZE_B_backward
         ctx.BLOCK_SIZE_H_backward = BLOCK_SIZE_H_backward
 
-        ctx.save_for_backward(x, weight, rmsnorm_denominator)
-
         return output
 
     @staticmethod
+    @ensure_contiguous
     def backward(ctx, output_grad: torch.Tensor) -> tuple[torch.Tensor | None]:
-        memory_efficient = ctx.memory_efficient
-
         x, weight, rmsnorm_denominator = ctx.saved_tensors
 
         x_grad, weight_grad = _backward(
@@ -54,7 +65,6 @@ class _RMSNorm_Cute(torch.autograd.Function):
             eps=ctx.eps,
             rmsnorm_denominator=rmsnorm_denominator,
             output_grad=output_grad,
-            memory_efficient=memory_efficient,
             kernel_backend=ctx.kernel_backend_backward,
             BLOCK_SIZE_B=ctx.BLOCK_SIZE_B_backward,
             BLOCK_SIZE_H=ctx.BLOCK_SIZE_H_backward,
