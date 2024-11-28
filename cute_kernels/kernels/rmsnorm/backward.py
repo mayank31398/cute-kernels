@@ -3,7 +3,7 @@ import triton
 
 from ...constants import MAX_TRITON_BLOCK_SIZE, TORCH_TO_TRITON_DTYPE, TRITON_BLOCK_SIZES_POWERS_OF_2
 from ...enums import KernelBackend
-from ...utils import CutoTuneConfig, ceil_divide, cutotune, ensure_same_strides, get_sm_count
+from ...utils import CutoTuneConfig, ceil_divide, cutotune, get_sm_count
 from .triton_implementation import rmsnorm_backward_triton_kernel
 
 

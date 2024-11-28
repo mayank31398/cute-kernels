@@ -64,10 +64,9 @@ def _forward(
         num_elements = x.numel()
         num_programs = ceil_divide(num_elements, BLOCK_SIZE)
 
-        with torch.device(x.device):
-            add_tensor_forward_triton_kernel[num_programs,](
-                x_ptr=x, y_ptr=y, output_ptr=output, num_elements=num_elements, BLOCK_SIZE=BLOCK_SIZE
-            )
+        add_tensor_forward_triton_kernel[num_programs,](
+            x_ptr=x, y_ptr=y, output_ptr=output, num_elements=num_elements, BLOCK_SIZE=BLOCK_SIZE
+        )
     else:
         raise ValueError(f"unexpected kernel_backend ({kernel_backend})")
 
