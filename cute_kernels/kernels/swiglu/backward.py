@@ -72,16 +72,15 @@ def _backward(
     elif kernel_backend == KernelBackend.triton:
         num_elements = gate.numel()
 
-        with torch.device(gate.device):
-            swiglu_backward_triton_kernel[ceil_divide(num_elements, BLOCK_SIZE),](
-                gate_ptr=gate,
-                up_ptr=up,
-                output_grad_ptr=output_grad,
-                gate_grad_ptr=gate_grad,
-                up_grad_ptr=up_grad,
-                num_elements=num_elements,
-                BLOCK_SIZE=BLOCK_SIZE,
-            )
+        swiglu_backward_triton_kernel[ceil_divide(num_elements, BLOCK_SIZE),](
+            gate_ptr=gate,
+            up_ptr=up,
+            output_grad_ptr=output_grad,
+            gate_grad_ptr=gate_grad,
+            up_grad_ptr=up_grad,
+            num_elements=num_elements,
+            BLOCK_SIZE=BLOCK_SIZE,
+        )
     else:
         raise ValueError(f"unexpected kernel_backend ({kernel_backend})")
 
