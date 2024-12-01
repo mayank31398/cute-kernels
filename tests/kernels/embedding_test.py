@@ -23,6 +23,19 @@ class EmbeddingTest(TestCommons):
             [64],  # BLOCK_SIZE_H_backward
             [embedding_cute, torch.compile(embedding_cute)],  # function
         )
+        + TestCommons.make_args_matrix(
+            [(51, 17), (19, 239), (7, 7537), (9, 1749)],  # input_ids_size
+            [(7153, 937), (27153, 1937), (97153, 2937), (17153, 31937)],  # weight_size
+            [torch.device("cuda")],  # device
+            [torch.float32, torch.float16],  # dtype
+            [KernelBackend.cuda],  # kernel_backend_forward
+            [KernelBackend.triton],  # kernel_backend_backward
+            [32],  # BLOCK_SIZE_B_forward
+            [32],  # BLOCK_SIZE_B_backward
+            [32],  # BLOCK_SIZE_H_forward
+            [32],  # BLOCK_SIZE_H_backward
+            [embedding_cute, torch.compile(embedding_cute)],  # function
+        )
     )
     def test_embedding(
         self,

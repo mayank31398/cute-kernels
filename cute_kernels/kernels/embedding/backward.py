@@ -42,7 +42,7 @@ def _backward(
             embedding_backward_triton_kernel[
                 (ceil_divide(num_elements, BLOCK_SIZE_B), ceil_divide(hidden_size, BLOCK_SIZE_H))
             ](
-                x_ptr=input_ids,
+                input_ids_ptr=input_ids,
                 output_grad_ptr=output_grad,
                 weight_grad_ptr=weight_grad,
                 B=num_elements,
