@@ -15,12 +15,15 @@ from .kernels import (
     rmsnorm_torch,
     swiglu_cute,
     swiglu_torch,
+    swiglu_unchunked_cute,
+    swiglu_unchunked_torch,
 )
 from .tensor import CuteTensor
 from .utils import (
     CuteInductor,
     CutoTuneConfig,
     CutoTuneParameter,
+    ceil_divide,
     cutotune,
     device_synchronize,
     get_cartesian_product_cutotune_configs,

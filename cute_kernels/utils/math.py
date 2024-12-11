@@ -17,3 +17,8 @@ def get_powers_of_2(start: int, end: int) -> list[int]:
         n = n << 1
 
     return output
+
+
+def divide_if_divisible(dividend: int, divisor: int, msg: str = "") -> int:
+    assert dividend % divisor == 0, msg
+    return dividend // divisor
