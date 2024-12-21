@@ -21,9 +21,10 @@ def forward_backward(kernel: Callable, *args, **kwargs) -> None:
 
 
 set_seed(42)
+all_dtypes = [torch.float32, torch.float16, torch.bfloat16]
 
 
-for dtype in [torch.float32, torch.float16, torch.bfloat16]:
+for dtype in all_dtypes:
     for size in [104857600]:
         x = torch.randn(size, dtype=dtype, device=torch.cuda.current_device(), requires_grad=True)
 
@@ -37,8 +38,6 @@ for dtype in [torch.float32, torch.float16, torch.bfloat16]:
             torch.randn(size, dtype=dtype, device=torch.cuda.current_device(), requires_grad=True),
         )
 
-
-for dtype in [torch.float32, torch.float16, torch.bfloat16]:
     for power_of_2 in get_powers_of_2(1, 65536):
         size = (2048, power_of_2)
         print(dtype, size)
@@ -52,7 +51,6 @@ for dtype in [torch.float32, torch.float16, torch.bfloat16]:
             eps=1e-5,
         )
 
-for dtype in [torch.float32, torch.float16]:
     for input_ids_size in [(32, 4096)]:
         for weight_size in [(131072, 4096)]:
             forward_backward(

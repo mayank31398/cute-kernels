@@ -1,6 +1,5 @@
 import inspect
 from collections import defaultdict
-from time import perf_counter
 from typing import Any, Callable
 
 import torch
@@ -224,15 +223,17 @@ class _CutoTune:
         for _ in range(self.warmup_iterations):
             self.function(**kwargs)
 
-        device_synchronize()
-        start_time = perf_counter()
+        # TODO generalize to device Event
+        start = torch.cuda.Event(enable_timing=True)
+        end = torch.cuda.Event(enable_timing=True)
 
+        start.record()
         for _ in range(self.benchmark_iterations):
             self.function(**kwargs)
+        end.record()
 
         device_synchronize()
-        end_time = perf_counter()
-        elapsed_time = end_time - start_time
+        elapsed_time = start.elapsed_time(end)
 
         return elapsed_time / self.benchmark_iterations
 

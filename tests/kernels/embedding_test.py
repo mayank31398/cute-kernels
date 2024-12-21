@@ -14,7 +14,7 @@ class EmbeddingTest(TestCommons):
             [(51, 17), (19, 239), (7, 7537), (9, 1749)],  # input_ids_size
             [(7153, 937), (27153, 1937), (97153, 2937), (17153, 31937)],  # weight_size
             [torch.device("cuda")],  # device
-            [torch.float32, torch.float16],  # dtype
+            TestCommons.get_dtypes(),  # dtype
             [KernelBackend.triton],  # kernel_backend_forward
             [KernelBackend.triton],  # kernel_backend_backward
             [64],  # BLOCK_SIZE_B_forward

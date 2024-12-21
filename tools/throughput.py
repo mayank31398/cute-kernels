@@ -1,10 +1,9 @@
 from functools import partial
-from time import perf_counter
 
 import torch
 from tabulate import tabulate
 
-from cute_kernels import KernelBackend, add_tensor_cute, add_tensor_torch
+from cute_kernels import KernelBackend, add_tensor_cute, add_tensor_torch, device_synchronize
 
 
 n = 100
@@ -29,14 +28,17 @@ for dtype in [torch.float16, torch.bfloat16, torch.float32]:
         for i in range(n):
             z = kernel(x, y)
 
-        torch.cuda.synchronize()
-        s = perf_counter()
+        s = torch.cuda.Event(enable_timing=True)
+        e = torch.cuda.Event(enable_timing=True)
+
+        s.record()
         for i in range(n):
             z = kernel(x, y)
-        torch.cuda.synchronize()
-        e = perf_counter()
+        e.record()
 
-        row.append((e - s) / n)
+        device_synchronize()
+
+        row.append(s.elapsed_time(e) / n)
     table.append(row)
 
 
