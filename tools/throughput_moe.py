@@ -8,7 +8,7 @@ from cute_kernels import KernelBackend, LightningMoE, MoE_Torch, ScatterMoE, dev
 
 n = 100
 
-headers = ["dtype", "torch", "cuda", "triton"]
+headers = ["dtype", "torch", "scattermoe", "lightning_moe"]
 table = []
 
 with torch.no_grad():
