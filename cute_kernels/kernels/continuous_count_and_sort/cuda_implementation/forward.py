@@ -16,6 +16,7 @@ def continuous_count_and_sort_cuda(
     sorted_output: torch.Tensor,
     argsort_output: torch.Tensor,
     sm_count: int,
+    thread_block_cluster_size: int,
     size: int,
     BLOCK_SIZE: int,
 ) -> None: ...
