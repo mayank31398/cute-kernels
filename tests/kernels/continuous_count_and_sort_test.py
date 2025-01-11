@@ -18,7 +18,6 @@ class ContiguousCountTest(TestCommons):
         TestCommons.make_args_matrix(
             TestCommons.get_1d_tensor_sizes(),  # size
             [torch.device("cuda")],  # device
-            [1, 2, 4, 8],  # thread_block_cluster_size
             [64],  # BLOCK_SIZE_B
             [
                 continuous_count_and_sort_cute,
@@ -30,19 +29,13 @@ class ContiguousCountTest(TestCommons):
         self,
         size: int,
         device: torch.device,
-        thread_block_cluster_size: int,
         BLOCK_SIZE: int,
         function: Callable,
     ) -> None:
         set_seed(_SEED)
         x = torch.randint(0, _MAX_EXPERTS, (size,), device=device, dtype=torch.long)
 
-        z_kernel, _, _ = function(
-            x=x,
-            size=_MAX_EXPERTS,
-            thread_block_cluster_size=thread_block_cluster_size,
-            BLOCK_SIZE=BLOCK_SIZE,
-        )
+        z_kernel, _, _ = function(x=x, size=_MAX_EXPERTS, BLOCK_SIZE=BLOCK_SIZE)
         z_expected = continuous_count_torch(x.view(-1), size=_MAX_EXPERTS)
 
         self.assert_equal_tensors(z_kernel, z_expected, True)

@@ -5,7 +5,6 @@ void continuous_count_and_sort_cuda(const torch::Tensor &x,
                                     torch::Tensor &sorted_output,
                                     torch::Tensor &argsort_output,
                                     const uint &sm_count,
-                                    const uint &thread_block_cluster_size,
                                     const uint &C,
                                     const uint &BLOCK_SIZE);
 
