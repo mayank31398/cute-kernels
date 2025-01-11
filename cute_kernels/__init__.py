@@ -11,6 +11,7 @@ from .cutotune import (
 from .enums import KernelBackend
 from .inductor import init_inductor
 from .kernels import (
+    LightningMoE,
     MoE_Torch,
     ScatterMoE,
     add_scalar_cute,

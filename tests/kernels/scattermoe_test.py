@@ -3,7 +3,7 @@ import torch.nn as nn
 from parameterized import parameterized
 from transformers import set_seed
 
-from cute_kernels import MoE_Torch, ScatterMoE
+from cute_kernels import LightningMoE, MoE_Torch, ScatterMoE
 
 from ..test_commons import TestCommons
 
@@ -22,6 +22,7 @@ class ScatterMoETest(TestCommons):
             [8192],  # intermediate_size
             [True, False],  # is_glu
             [True, False],  # is_compiling
+            [ScatterMoE, LightningMoE],  # module_class
         )
     )
     def test_scattermoe(
@@ -34,30 +35,7 @@ class ScatterMoETest(TestCommons):
         intermediate_size: int,
         is_glu: bool,
         is_compiling: bool,
-    ) -> None:
-        self._test_scattermoe(
-            device=device,
-            dtype=dtype,
-            num_experts=num_experts,
-            num_experts_per_tok=num_experts_per_tok,
-            hidden_size=hidden_size,
-            intermediate_size=intermediate_size,
-            is_glu=is_glu,
-            module_class=ScatterMoE,
-            is_compiling=is_compiling,
-        )
-
-    def _test_scattermoe(
-        self,
-        device: torch.device,
-        dtype: torch.dtype,
-        num_experts: int,
-        num_experts_per_tok: int,
-        hidden_size: int,
-        intermediate_size: int,
-        is_glu: bool,
         module_class: type[nn.Module],
-        is_compiling: bool,
     ) -> None:
         set_seed(_SEED)
 
