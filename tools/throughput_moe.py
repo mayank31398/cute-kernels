@@ -23,26 +23,27 @@ for kernel in kernels:
 
 table = []
 
-for dtype in [torch.float16, torch.bfloat16, torch.float32]:
-    row = [str(dtype)]
-    for kernel in kernels:
-        x = torch.randn(4, 4096, 4096, device=torch.cuda.current_device(), dtype=dtype)
+with torch.no_grad():
+    for dtype in [torch.float16, torch.bfloat16, torch.float32]:
+        row = [str(dtype)]
+        for kernel in kernels:
+            x = torch.randn(4, 4096, 4096, device=torch.cuda.current_device(), dtype=dtype)
 
-        for i in range(n):
-            z = kernel(x)
+            for i in range(n):
+                z = kernel(x)
 
-        s = torch.cuda.Event(enable_timing=True)
-        e = torch.cuda.Event(enable_timing=True)
+            s = torch.cuda.Event(enable_timing=True)
+            e = torch.cuda.Event(enable_timing=True)
 
-        s.record()
-        for i in range(n):
-            z = kernel(x)
-        e.record()
+            s.record()
+            for i in range(n):
+                z = kernel(x)
+            e.record()
 
-        device_synchronize()
+            device_synchronize()
 
-        row.append(s.elapsed_time(e) / n)
-    table.append(row)
+            row.append(s.elapsed_time(e) / n)
+        table.append(row)
 
 
 print(tabulate(table, headers=headers))
