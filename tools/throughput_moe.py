@@ -18,6 +18,9 @@ kernels = [
 for kernel in kernels[1:]:
     kernel.load_state_dict(kernels[0].state_dict())
 
+for kernel in kernels:
+    kernel.to(torch.cuda.current_device())
+
 table = []
 
 for dtype in [torch.float16, torch.bfloat16, torch.float32]:
