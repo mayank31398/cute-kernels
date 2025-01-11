@@ -120,6 +120,8 @@ void continuous_count_cuda(const torch::Tensor &x,
 
     AT_DISPATCH_CUSTOM_INT_TYPES(
         x.scalar_type(), "continuous_count_cuda_kernel", ([&] {
+            const uint32 num_elements_per_thread = 16 / sizeof(scalar_t);
+
             cudaFuncSetAttribute(_continuous_count_cuda_kernel<scalar_t>,
                                  cudaFuncAttributeMaxDynamicSharedMemorySize,
                                  MAX_ALLOWED_C * sizeof(uint32));
@@ -132,7 +134,6 @@ void continuous_count_cuda(const torch::Tensor &x,
                 ChunkedArray<uint32> output_chunk = output_chunks[i];
 
                 const uint64 num_elements = x_chunk.num_elements;
-
                 auto [NUM_BLOCKS, cluster_size] = get_num_blocks(
                     num_elements, BLOCK_SIZE, num_elements_per_thread, max_num_blocks, thread_block_cluster_size);
 
