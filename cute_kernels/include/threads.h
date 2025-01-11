@@ -36,9 +36,12 @@ inline __host__ int get_max_thread_blocks(const int &sm_count, const int &thread
 
 inline __host__ std::tuple<uint32, uint32> get_num_blocks(const uint64 &num_elements,
                                                           const uint32 &BLOCK_SIZE,
+                                                          const uint32 &num_elements_per_thread = 1,
                                                           const uint32 &sm_count = 0,
                                                           const uint32 &max_thread_block_cluster_size = 1) {
-    uint32 NUM_BLOCKS = ceil_divide<uint64>(num_elements, BLOCK_SIZE);
+    const uint32 num_elements_per_block = num_elements_per_thread * BLOCK_SIZE;
+
+    uint32 NUM_BLOCKS = ceil_divide<uint64>(num_elements, num_elements_per_block);
     if (sm_count != 0 && NUM_BLOCKS > sm_count) {
         NUM_BLOCKS = sm_count;
     }

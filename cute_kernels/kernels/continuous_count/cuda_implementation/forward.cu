@@ -45,12 +45,14 @@ inline __device__ void _update_local_count(const scalar_t *x,
     for (uint32 i = global_thread_id; i < num_elements4; i += gridDim.x * blockDim.x) {
         if constexpr (std::is_same_v<scalar_t, uint32> || std::is_same_v<scalar_t, int32>) {
             uint32_4 _x = ((uint32_4 *)x)[i];
+
             atomicAdd(&shared_memory[_x.x], 1);
             atomicAdd(&shared_memory[_x.y], 1);
             atomicAdd(&shared_memory[_x.z], 1);
             atomicAdd(&shared_memory[_x.w], 1);
         } else if constexpr (std::is_same_v<scalar_t, uint64> || std::is_same_v<scalar_t, int64>) {
             uint64_2 _x = ((uint64_2 *)x)[i];
+
             atomicAdd(&shared_memory[_x.x], 1);
             atomicAdd(&shared_memory[_x.y], 1);
         }
@@ -116,49 +118,50 @@ void continuous_count_cuda(const torch::Tensor &x,
 
     std::vector<ChunkedArray<uint32>> output_chunks = chunk_array<uint32>(output.data_ptr<uint32>(), total_elements);
 
-    AT_DISPATCH_CUSTOM_INT_TYPES(x.scalar_type(), "continuous_count_cuda_kernel", ([&] {
-                                     cudaFuncSetAttribute(_continuous_count_cuda_kernel<scalar_t>,
-                                                          cudaFuncAttributeMaxDynamicSharedMemorySize,
-                                                          MAX_ALLOWED_C * sizeof(uint32));
+    AT_DISPATCH_CUSTOM_INT_TYPES(
+        x.scalar_type(), "continuous_count_cuda_kernel", ([&] {
+            cudaFuncSetAttribute(_continuous_count_cuda_kernel<scalar_t>,
+                                 cudaFuncAttributeMaxDynamicSharedMemorySize,
+                                 MAX_ALLOWED_C * sizeof(uint32));
 
-                                     std::vector<ChunkedArray<scalar_t>> x_chunks =
-                                         chunk_array<scalar_t>(x.data_ptr<scalar_t>(), total_elements);
+            std::vector<ChunkedArray<scalar_t>> x_chunks =
+                chunk_array<scalar_t>(x.data_ptr<scalar_t>(), total_elements);
 
-                                     for (int i = 0; i < x_chunks.size(); i++) {
-                                         ChunkedArray<scalar_t> x_chunk = x_chunks[i];
-                                         ChunkedArray<uint32> output_chunk = output_chunks[i];
+            for (int i = 0; i < x_chunks.size(); i++) {
+                ChunkedArray<scalar_t> x_chunk = x_chunks[i];
+                ChunkedArray<uint32> output_chunk = output_chunks[i];
 
-                                         const uint64 num_elements = x_chunk.num_elements;
+                const uint64 num_elements = x_chunk.num_elements;
 
-                                         auto [NUM_BLOCKS, cluster_size] = get_num_blocks(
-                                             num_elements, BLOCK_SIZE, max_num_blocks, thread_block_cluster_size);
+                auto [NUM_BLOCKS, cluster_size] = get_num_blocks(
+                    num_elements, BLOCK_SIZE, num_elements_per_thread, max_num_blocks, thread_block_cluster_size);
 
-                                         // dynamically sized clusters need this stupid way of launching the kernel
-                                         cudaLaunchConfig_t launch_config = {0};
-                                         launch_config.blockDim = BLOCK_SIZE;
-                                         launch_config.gridDim = NUM_BLOCKS;
-                                         launch_config.dynamicSmemBytes = C * sizeof(uint32);
+                // dynamically sized clusters need this stupid way of launching the kernel
+                cudaLaunchConfig_t launch_config = {0};
+                launch_config.blockDim = BLOCK_SIZE;
+                launch_config.gridDim = NUM_BLOCKS;
+                launch_config.dynamicSmemBytes = C * sizeof(uint32);
 
-                                         cudaLaunchAttribute attributes[2];
+                cudaLaunchAttribute attributes[2];
 
-                                         attributes[0].id = cudaLaunchAttributeClusterDimension;
-                                         attributes[0].val.clusterDim.x = cluster_size;
-                                         attributes[0].val.clusterDim.y = 1;
-                                         attributes[0].val.clusterDim.z = 1;
+                attributes[0].id = cudaLaunchAttributeClusterDimension;
+                attributes[0].val.clusterDim.x = cluster_size;
+                attributes[0].val.clusterDim.y = 1;
+                attributes[0].val.clusterDim.z = 1;
 
-                                         attributes[1].id = cudaLaunchAttributeCooperative;
-                                         attributes[1].val.cooperative = 1;
+                attributes[1].id = cudaLaunchAttributeCooperative;
+                attributes[1].val.cooperative = 1;
 
-                                         launch_config.attrs = attributes;
-                                         launch_config.numAttrs = 2;
+                launch_config.attrs = attributes;
+                launch_config.numAttrs = 2;
 
-                                         cudaLaunchKernelEx(&launch_config,
-                                                            _continuous_count_cuda_kernel<scalar_t>,
-                                                            x_chunk.array,
-                                                            output_chunk.array,
-                                                            num_elements,
-                                                            C,
-                                                            i == 0);
-                                     }
-                                 }));
+                cudaLaunchKernelEx(&launch_config,
+                                   _continuous_count_cuda_kernel<scalar_t>,
+                                   x_chunk.array,
+                                   output_chunk.array,
+                                   num_elements,
+                                   C,
+                                   i == 0);
+            }
+        }));
 }
