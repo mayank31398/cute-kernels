@@ -4,7 +4,7 @@ import torch
 from parameterized import parameterized
 from transformers import set_seed
 
-from cute_kernels import KernelBackend, continuous_count_and_sort_cute, continuous_count_torch
+from cute_kernels import continuous_count_and_sort_cute, continuous_count_torch
 
 from ..test_commons import TestCommons
 
