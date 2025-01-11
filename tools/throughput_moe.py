@@ -14,16 +14,19 @@ table = []
 with torch.no_grad():
     for dtype in [torch.float32, torch.float16, torch.bfloat16]:
         kernels = [
-            MoE_Torch(64, 2, 4096, 512, swiglu_unchunked_cute, True, False, 0.02),
-            ScatterMoE(64, 2, 4096, 512, swiglu_unchunked_cute, True, False, 0.02),
-            LightningMoE(64, 2, 4096, 512, swiglu_unchunked_cute, True, False, 0.02),
+            MoE_Torch(64, 2, 4096, 512, swiglu_unchunked_cute, True, False, 0.02).to(
+                dtype=dtype, device=torch.cuda.current_device()
+            ),
+            ScatterMoE(64, 2, 4096, 512, swiglu_unchunked_cute, True, False, 0.02).to(
+                dtype=dtype, device=torch.cuda.current_device()
+            ),
+            LightningMoE(64, 2, 4096, 512, swiglu_unchunked_cute, True, False, 0.02).to(
+                dtype=dtype, device=torch.cuda.current_device()
+            ),
         ]
 
         for kernel in kernels[1:]:
             kernel.load_state_dict(kernels[0].state_dict())
-
-        for kernel in kernels:
-            kernel.to(torch.cuda.current_device())
 
         row = [str(dtype)]
         for kernel in kernels:
