@@ -12,7 +12,7 @@ from .enums import KernelBackend
 from .inductor import init_inductor
 from .kernels import (
     MoE_Torch,
-    MoE_Triton,
+    ScatterMoE,
     add_scalar_cute,
     add_scalar_torch,
     add_tensor_cute,

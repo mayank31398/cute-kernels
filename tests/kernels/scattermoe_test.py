@@ -3,7 +3,7 @@ import torch.nn as nn
 from parameterized import parameterized
 from transformers import set_seed
 
-from cute_kernels import MoE_Torch, MoE_Triton
+from cute_kernels import MoE_Torch, ScatterMoE
 
 from ..test_commons import TestCommons
 
@@ -24,7 +24,7 @@ class ScatterMoETest(TestCommons):
             [True, False],  # is_compiling
         )
     )
-    def test_scattermoe_triton(
+    def test_scattermoe(
         self,
         device: torch.device,
         dtype: torch.dtype,
@@ -43,7 +43,7 @@ class ScatterMoETest(TestCommons):
             hidden_size=hidden_size,
             intermediate_size=intermediate_size,
             is_glu=is_glu,
-            module_class=MoE_Triton,
+            module_class=ScatterMoE,
             is_compiling=is_compiling,
         )
 

@@ -21,13 +21,6 @@ def bincount(x: torch.Tensor, minlength: int) -> torch.Tensor:
     return x.bincount(minlength=minlength)
 
 
-def expert_boundaries(sorted_experts_idxs: torch.Tensor, k: int) -> torch.Tensor:
-    # there is an overhead of launching a custom op so we only use the custom op when compiling
-    expert_counts = bincount(sorted_experts_idxs, k)
-    expert_boundaries_end = expert_counts.cumsum(-1)
-    return expert_boundaries_end
-
-
 @cute_op(f"{LIBRARY_NAME}::scatter2scatter", mutates_args={"out"})
 def scatter2scatter(
     X: torch.Tensor,
