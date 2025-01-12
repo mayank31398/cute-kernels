@@ -77,9 +77,9 @@ __global__ void _continuous_count_and_sort_cuda_kernel(const scalar_t *x,
 
     __syncthreads();
 
-    // write the output to the global memory
+    // write the output to the global memory and also record how many of the elements have been written before
     for (uint32 i = local_thread_id; i < C; i += blockDim.x) {
-        atomicAdd(&count_output[i], shared_memory[i]);
+        shared_memory[i + C] = atomicAdd(&count_output[i], shared_memory[i]);
     }
 }
 
@@ -103,7 +103,7 @@ void continuous_count_and_sort_cuda(const torch::Tensor &x,
 
                                      cudaFuncSetAttribute(_continuous_count_and_sort_cuda_kernel<scalar_t>,
                                                           cudaFuncAttributeMaxDynamicSharedMemorySize,
-                                                          MAX_ALLOWED_C * sizeof(uint32));
+                                                          2 * MAX_ALLOWED_C * sizeof(uint32));
 
                                      // dynamically sized clusters need this stupid way of launching the kernel
                                      cudaLaunchConfig_t launch_config = {0};
