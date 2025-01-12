@@ -12,16 +12,6 @@
 
 namespace cg = cooperative_groups;
 
-inline __device__ void _looped_atomic_add(
-    uint32 *source, uint32 *destination, const uint32 &num_loops_C, const uint32 &C, const uint32 &local_thread_id) {
-    for (int i = 0; i < num_loops_C; i++) {
-        const uint32 index = i * blockDim.x + local_thread_id;
-        if (index < C) {
-            atomicAdd(&destination[index], source[index]);
-        }
-    }
-}
-
 inline __device__ void _initialize_global_output(uint32 *output, const uint32 &C, const uint32 &global_thread_id) {
     const uint32 C4 = C >> 2;
     for (uint32 i = global_thread_id; i < C4; i += gridDim.x * blockDim.x) {
@@ -73,15 +63,11 @@ __global__ void _continuous_count_and_sort_cuda_kernel(const scalar_t *x,
                                                        const uint32 C) {
     const uint32 local_thread_id = get_local_thread_id();
     const uint32 global_thread_id = get_global_thread_id();
-    const uint32 num_loops_C = ceil_divide<uint32>(C, blockDim.x);
 
     extern __shared__ uint32 shared_memory[];
 
-    for (uint32 i = 0; i < num_loops_C; i++) {
-        const uint32 index = i * blockDim.x + local_thread_id;
-        if (index < C) {
-            shared_memory[index] = 0;
-        }
+    for (uint32 i = local_thread_id; i < C; i += blockDim.x) {
+        shared_memory[i] = 0;
     }
 
     _initialize_global_output(count_output, C, global_thread_id);
@@ -92,7 +78,9 @@ __global__ void _continuous_count_and_sort_cuda_kernel(const scalar_t *x,
     __syncthreads();
 
     // write the output to the global memory
-    _looped_atomic_add(shared_memory, count_output, num_loops_C, C, local_thread_id);
+    for (int i = local_thread_id; i < C; i += blockDim.x) {
+        atomicAdd(&count_output[i], shared_memory[i]);
+    }
 }
 
 void continuous_count_and_sort_cuda(const torch::Tensor &x,
