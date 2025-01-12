@@ -108,8 +108,6 @@ void continuous_count_and_sort_cuda(const torch::Tensor &x,
     const uint64 num_elements = x.numel();
     assert(num_elements <= std::numeric_limits<uint32>::max());
 
-    std::vector<ChunkedArray<uint32>> output_chunks = chunk_array<uint32>(output.data_ptr<uint32>(), total_elements);
-
     AT_DISPATCH_CUSTOM_INT_TYPES(x.scalar_type(), "continuous_count_and_sort_cuda_kernel", ([&] {
                                      const uint32 num_elements_per_thread = 16 / sizeof(scalar_t);
                                      auto [NUM_BLOCKS, _] =
