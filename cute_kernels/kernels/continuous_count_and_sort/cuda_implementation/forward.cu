@@ -84,7 +84,7 @@ __global__ void _continuous_count_and_sort_cuda_kernel(const scalar_t *x,
         }
     }
 
-    _initialize_global_output(output, C, global_thread_id);
+    _initialize_global_output(count_output, C, global_thread_id);
     cg::this_grid().sync();
 
     _update_local_count<scalar_t>(x, shared_memory, num_elements, global_thread_id);
@@ -92,7 +92,7 @@ __global__ void _continuous_count_and_sort_cuda_kernel(const scalar_t *x,
     __syncthreads();
 
     // write the output to the global memory
-    _looped_atomic_add(shared_memory, output, num_loops_C, C, local_thread_id);
+    _looped_atomic_add(shared_memory, count_output, num_loops_C, C, local_thread_id);
 }
 
 void continuous_count_and_sort_cuda(const torch::Tensor &x,
