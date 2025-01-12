@@ -12,13 +12,12 @@
 
 namespace cg = cooperative_groups;
 
-inline __device__ void _looped_atomic_add(
-    uint32 *source, uint32 *destination, const uint32 &num_loops_C, const uint32 &C, const uint32 &local_thread_id) {
-    for (int i = 0; i < num_loops_C; i++) {
-        const uint32 index = i * blockDim.x + local_thread_id;
-        if (index < C) {
-            atomicAdd(&destination[index], source[index]);
-        }
+inline __device__ void _looped_atomic_add(uint32 *source,
+                                          uint32 *destination,
+                                          const uint32 &C,
+                                          const uint32 &local_thread_id) {
+    for (int i = local_thread_id; i < C; i += blockDim.x) {
+        atomicAdd(&destination[i], source[i]);
     }
 }
 
@@ -69,15 +68,11 @@ __global__ void _continuous_count_cuda_kernel(
     const scalar_t *x, uint32 *output, const uint32 num_elements, const uint32 C, const bool initialize_output) {
     const uint32 local_thread_id = get_local_thread_id();
     const uint32 global_thread_id = get_global_thread_id();
-    const uint32 num_loops_C = ceil_divide<uint32>(C, blockDim.x);
 
     extern __shared__ uint32 shared_memory[];
 
-    for (uint32 i = 0; i < num_loops_C; i++) {
-        const uint32 index = i * blockDim.x + local_thread_id;
-        if (index < C) {
-            shared_memory[index] = 0;
-        }
+    for (uint32 i = local_thread_id; i < C; i += blockDim.x) {
+        shared_memory[i] = 0;
     }
 
     if (initialize_output) {
@@ -93,14 +88,14 @@ __global__ void _continuous_count_cuda_kernel(
     __syncthreads();
 
     if (!is_first_cluster_block) {
-        _looped_atomic_add(shared_memory, cluster.map_shared_rank(shared_memory, 0), num_loops_C, C, local_thread_id);
+        _looped_atomic_add(shared_memory, cluster.map_shared_rank(shared_memory, 0), C, local_thread_id);
     }
 
     cluster.sync();
 
     // write the output to the global memory
     if (is_first_cluster_block) {
-        _looped_atomic_add(shared_memory, output, num_loops_C, C, local_thread_id);
+        _looped_atomic_add(shared_memory, output, C, local_thread_id);
     }
 }
 
