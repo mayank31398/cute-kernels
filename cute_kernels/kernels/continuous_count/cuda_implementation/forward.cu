@@ -109,7 +109,7 @@ void continuous_count_cuda(const torch::Tensor &x,
     assert(C <= MAX_ALLOWED_C);
 
     const uint64 total_elements = x.numel();
-    const int max_num_blocks = get_max_thread_blocks(sm_count, thread_block_cluster_size);
+    const uint32 max_num_blocks = get_max_thread_blocks(sm_count, thread_block_cluster_size);
 
     std::vector<ChunkedArray<uint32>> output_chunks = chunk_array<uint32>(output.data_ptr<uint32>(), total_elements);
 
@@ -124,7 +124,7 @@ void continuous_count_cuda(const torch::Tensor &x,
             std::vector<ChunkedArray<scalar_t>> x_chunks =
                 chunk_array<scalar_t>(x.data_ptr<scalar_t>(), total_elements);
 
-            for (int i = 0; i < x_chunks.size(); i++) {
+            for (uint32 i = 0; i < x_chunks.size(); i++) {
                 ChunkedArray<scalar_t> x_chunk = x_chunks[i];
                 ChunkedArray<uint32> output_chunk = output_chunks[i];
 

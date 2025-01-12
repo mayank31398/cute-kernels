@@ -12,7 +12,7 @@ __global__ void _add_tensor_cuda_kernel(const scalar_t *x,
                                         const scalar_t *y,
                                         scalar_t *output,
                                         const uint32 num_elements) {
-    constexpr int num_elements_per_thread = 16 / sizeof(scalar_t);
+    constexpr uint32 num_elements_per_thread = 16 / sizeof(scalar_t);
     static_assert(num_elements_per_thread == 4 || num_elements_per_thread == 8);
 
     using dtype = DType<scalar_t>;
@@ -30,7 +30,7 @@ __global__ void _add_tensor_cuda_kernel(const scalar_t *x,
         // clang-format off
         #pragma unroll
         // clang-format on
-        for (int i = 0; i < 4; i++) {
+        for (uint32 i = 0; i < 4; i++) {
             if constexpr (std::is_same_v<scalar_t, fp32>) {
                 output_buffer[i] = x_vec[i] + y_vec[i];
             } else {
@@ -67,7 +67,7 @@ void add_tensor_cuda(const torch::Tensor &x, const torch::Tensor &y, torch::Tens
             std::vector<ChunkedArray<scalar_t>> output_chunks =
                 chunk_array<scalar_t>(output.data_ptr<scalar_t>(), total_elements);
 
-            for (int i = 0; i < x_chunks.size(); i++) {
+            for (uint32 i = 0; i < x_chunks.size(); i++) {
                 ChunkedArray<scalar_t> x_chunk = x_chunks[i];
                 ChunkedArray<scalar_t> y_chunk = y_chunks[i];
                 ChunkedArray<scalar_t> output_chunk = output_chunks[i];
