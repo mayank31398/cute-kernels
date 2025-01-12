@@ -16,7 +16,7 @@ inline __device__ void _looped_atomic_add(uint32 *source,
                                           uint32 *destination,
                                           const uint32 &C,
                                           const uint32 &local_thread_id) {
-    for (int i = local_thread_id; i < C; i += blockDim.x) {
+    for (uint32 i = local_thread_id; i < C; i += blockDim.x) {
         atomicAdd(&destination[i], source[i]);
     }
 }
