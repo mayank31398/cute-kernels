@@ -8,12 +8,12 @@
 template <typename T>
 struct ChunkedArray {
     T* array;
-    uint64 num_elements;
+    uint32 num_elements;
 };
 
 template <typename T>
 std::vector<ChunkedArray<T> > chunk_array(T* x, const uint64& num_elements) {
-    const uint64 num_elements_per_chunk = (uint64)std::numeric_limits<uint>::max() + 1;
+    const uint32 num_elements_per_chunk = (uint64)std::numeric_limits<uint>::max() - 3;
     uint64 start = 0;
 
     std::vector<ChunkedArray<T> > result;
@@ -21,7 +21,7 @@ std::vector<ChunkedArray<T> > chunk_array(T* x, const uint64& num_elements) {
     // We will "yield" chunks of the array, each of size 'chunk_size' or less
     while (start < num_elements) {
         uint64 remaining = num_elements - start;
-        uint64 current_chunk_size = std::min(remaining, num_elements_per_chunk);
+        uint32 current_chunk_size = std::min(remaining, num_elements_per_chunk);
 
         ChunkedArray<T> chunked_x;
         chunked_x.array = (T*)&x[start];
