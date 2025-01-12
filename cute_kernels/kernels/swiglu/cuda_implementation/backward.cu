@@ -14,7 +14,7 @@ __global__ void _swiglu_backward_cuda_kernel(const scalar_t *gate,
                                              const scalar_t *output_grad,
                                              scalar_t *gate_grad,
                                              scalar_t *up_grad,
-                                             const uint64 num_elements) {
+                                             const uint32 num_elements) {
     constexpr int num_elements_per_thread = 16 / sizeof(scalar_t);
     static_assert(num_elements_per_thread == 4 || num_elements_per_thread == 8);
 
@@ -113,8 +113,8 @@ void swiglu_backward_cuda(const torch::Tensor &gate,
                 ChunkedArray<scalar_t> gate_grad_chunk = gate_grad_chunks[i];
                 ChunkedArray<scalar_t> up_grad_chunk = up_grad_chunks[i];
 
-                const uint64 num_elements = gate_chunk.num_elements;
-                const uint32 NUM_BLOCKS = ceil_divide<uint64>(num_elements, num_elements_per_block);
+                const uint32 num_elements = gate_chunk.num_elements;
+                const uint32 NUM_BLOCKS = ceil_divide<uint32>(num_elements, num_elements_per_block);
 
                 _swiglu_backward_cuda_kernel<scalar_t><<<NUM_BLOCKS, BLOCK_SIZE>>>(gate_chunk.array,
                                                                                    up_chunk.array,

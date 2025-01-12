@@ -37,7 +37,7 @@ inline __device__ void _initialize_global_output(uint32 *output, const uint32 &C
 template <typename scalar_t>
 inline __device__ void _update_local_count(const scalar_t *x,
                                            uint32 *shared_memory,
-                                           const uint64 &num_elements,
+                                           const uint32 &num_elements,
                                            const uint32 &global_thread_id) {
     const uint32 num_elements_per_thread = 16 / sizeof(scalar_t);
     const uint32 num_elements4 = num_elements / num_elements_per_thread;
@@ -66,7 +66,7 @@ inline __device__ void _update_local_count(const scalar_t *x,
 
 template <typename scalar_t>
 __global__ void _continuous_count_cuda_kernel(
-    const scalar_t *x, uint32 *output, const uint64 num_elements, const uint32 C, const bool initialize_output) {
+    const scalar_t *x, uint32 *output, const uint32 num_elements, const uint32 C, const bool initialize_output) {
     const uint32 local_thread_id = get_local_thread_id();
     const uint32 global_thread_id = get_global_thread_id();
     const uint32 num_loops_C = ceil_divide<uint32>(C, blockDim.x);
@@ -133,8 +133,8 @@ void continuous_count_cuda(const torch::Tensor &x,
                 ChunkedArray<scalar_t> x_chunk = x_chunks[i];
                 ChunkedArray<uint32> output_chunk = output_chunks[i];
 
-                const uint64 num_elements = x_chunk.num_elements;
-                auto [NUM_BLOCKS, cluster_size] = get_num_blocks(
+                const uint32 num_elements = x_chunk.num_elements;
+                auto [NUM_BLOCKS, cluster_size] = get_num_blocks<uint32>(
                     num_elements, BLOCK_SIZE, num_elements_per_thread, max_num_blocks, thread_block_cluster_size);
 
                 // dynamically sized clusters need this stupid way of launching the kernel

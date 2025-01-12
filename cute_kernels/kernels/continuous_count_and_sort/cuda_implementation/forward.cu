@@ -37,7 +37,7 @@ inline __device__ void _initialize_global_output(uint32 *output, const uint32 &C
 template <typename scalar_t>
 inline __device__ void _update_local_count(const scalar_t *x,
                                            uint32 *shared_memory,
-                                           const uint64 &num_elements,
+                                           const uint32 &num_elements,
                                            const uint32 &global_thread_id) {
     const uint32 num_elements_per_thread = 16 / sizeof(scalar_t);
     const uint32 num_elements4 = num_elements / num_elements_per_thread;
@@ -69,7 +69,7 @@ __global__ void _continuous_count_and_sort_cuda_kernel(const scalar_t *x,
                                                        uint32 *count_output,
                                                        uint32 *sorted_output,
                                                        uint32 *argsort_output,
-                                                       const uint64 num_elements,
+                                                       const uint32 num_elements,
                                                        const uint32 C) {
     const uint32 local_thread_id = get_local_thread_id();
     const uint32 global_thread_id = get_global_thread_id();
@@ -110,8 +110,8 @@ void continuous_count_and_sort_cuda(const torch::Tensor &x,
 
     AT_DISPATCH_CUSTOM_INT_TYPES(x.scalar_type(), "continuous_count_and_sort_cuda_kernel", ([&] {
                                      const uint32 num_elements_per_thread = 16 / sizeof(scalar_t);
-                                     auto [NUM_BLOCKS, _] =
-                                         get_num_blocks(num_elements, BLOCK_SIZE, num_elements_per_thread, sm_count);
+                                     auto [NUM_BLOCKS, _] = get_num_blocks<uint32>(
+                                         num_elements, BLOCK_SIZE, num_elements_per_thread, sm_count);
 
                                      cudaFuncSetAttribute(_continuous_count_and_sort_cuda_kernel<scalar_t>,
                                                           cudaFuncAttributeMaxDynamicSharedMemorySize,

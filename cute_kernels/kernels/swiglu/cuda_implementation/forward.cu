@@ -12,7 +12,7 @@ template <typename scalar_t>
 __global__ void _swiglu_forward_cuda_kernel(const scalar_t *gate,
                                             const scalar_t *up,
                                             scalar_t *output,
-                                            const uint64 num_elements) {
+                                            const uint32 num_elements) {
     constexpr int num_elements_per_thread = 16 / sizeof(scalar_t);
     static_assert(num_elements_per_thread == 4 || num_elements_per_thread == 8);
 
@@ -78,9 +78,9 @@ void swiglu_forward_cuda(const torch::Tensor &gate,
                                            ChunkedArray<scalar_t> up_chunk = up_chunks[i];
                                            ChunkedArray<scalar_t> output_chunk = output_chunks[i];
 
-                                           const uint64 num_elements = gate_chunk.num_elements;
+                                           const uint32 num_elements = gate_chunk.num_elements;
                                            const uint32 NUM_BLOCKS =
-                                               ceil_divide<uint64>(num_elements, num_elements_per_block);
+                                               ceil_divide<uint32>(num_elements, num_elements_per_block);
 
                                            _swiglu_forward_cuda_kernel<scalar_t><<<NUM_BLOCKS, BLOCK_SIZE>>>(
                                                gate_chunk.array, up_chunk.array, output_chunk.array, num_elements);
