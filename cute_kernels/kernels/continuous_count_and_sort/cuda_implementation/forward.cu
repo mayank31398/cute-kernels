@@ -106,7 +106,7 @@ void continuous_count_and_sort_cuda(const torch::Tensor &x,
     assert(C <= MAX_ALLOWED_C);
 
     const uint64 num_elements = x.numel();
-    assert(num_elements <= std::numeric_limits<uint32>::max());
+    assert(num_elements <= std::numeric_limits<uint32>::max() - 3);
 
     AT_DISPATCH_CUSTOM_INT_TYPES(x.scalar_type(), "continuous_count_and_sort_cuda_kernel", ([&] {
                                      const uint32 num_elements_per_thread = 16 / sizeof(scalar_t);
