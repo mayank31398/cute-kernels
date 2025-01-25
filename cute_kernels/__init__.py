@@ -24,6 +24,10 @@ from .kernels import (
     continuous_count_torch,
     embedding_cute,
     embedding_torch,
+    gemm_cute,
+    gemm_torch,
+    linear_cute,
+    linear_torch,
     rmsnorm_cute,
     rmsnorm_torch,
     swiglu_cute,
@@ -33,4 +37,4 @@ from .kernels import (
 )
 from .math import ceil_divide, get_powers_of_2
 from .tensor import CuteTensor
-from .utils import device_synchronize, get_triton_num_warps
+from .utils import device_synchronize, get_ptx_from_triton_kernel, get_triton_num_warps
