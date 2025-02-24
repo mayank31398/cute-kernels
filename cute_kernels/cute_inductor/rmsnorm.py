@@ -22,7 +22,7 @@ def replace_rmsnorm(gm: GraphModule, node: Node) -> None:
     x = kwargs["x"]
     normalized_shape = kwargs.pop("normalized_shape")
 
-    if normalized_shape in [x.size(-1), (x.size(-1),)]:
+    if normalized_shape == (x.size(-1),):
         with gm.graph.inserting_after(node):
             new_node = gm.graph.call_function(rmsnorm_cute, kwargs=kwargs)
 
