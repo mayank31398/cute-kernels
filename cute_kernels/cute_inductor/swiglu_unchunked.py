@@ -54,6 +54,10 @@ def replace_swiglu_unchunked(gm: GraphModule, node: Node) -> None:
     if not _check_is_valid_chunk(node):
         return
 
+    # chunk output should only have 2 users
+    if (len(node.users)) != 2:
+        return
+
     valid, output = _check_swiglu_after_chunk_and_get_output_node(*list(node.users.keys()))
     if not valid:
         return
