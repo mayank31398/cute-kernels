@@ -7,21 +7,20 @@ from torch.fx.graph_module import GraphModule
 
 from ..kernels import swiglu_unchunked_cute
 from .constants import CALL_FUNCTION, CALL_METHOD
+from .utils import parse_args_and_kwargs_to_kwargs
 
 
 def _check_is_valid_chunk(node: Node) -> bool:
     if not (node.op == CALL_METHOD and node.target == torch.chunk.__name__):
         return False
 
-    chunks = node.kwargs.get("chunks", node.args[1])
-    if chunks != 2:
+    kwargs = parse_args_and_kwargs_to_kwargs(["input", "chunks", "dim"], node.args, node.kwargs)
+
+    if kwargs["chunks"] != 2:
         return False
 
     # dim should be last dim or skip
-    if node.kwargs.get("dim", node.args[2]) != -1:
-        return False
-
-    return True
+    return kwargs["dim"] == -1
 
 
 def _check_swiglu_after_chunk_and_get_output_node(x: Node, y: Node) -> tuple[bool, Node]:
