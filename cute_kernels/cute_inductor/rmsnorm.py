@@ -18,15 +18,12 @@ def replace_rmsnorm(gm: GraphModule, node: Node) -> None:
     kwargs = parse_args_and_kwargs_to_kwargs(signature=signature, args=node.args, kwargs=node.kwargs)
 
     kwargs["x"] = kwargs.pop("input")
+    kwargs.pop("normalized_shape")
 
-    x = kwargs["x"]
-    normalized_shape = kwargs.pop("normalized_shape")
+    with gm.graph.inserting_after(node):
+        new_node = gm.graph.call_function(rmsnorm_cute, kwargs=kwargs)
 
-    if normalized_shape == (x.size(-1),):
-        with gm.graph.inserting_after(node):
-            new_node = gm.graph.call_function(rmsnorm_cute, kwargs=kwargs)
+    print("replacing with rmsnorm_cute")
 
-        print("replacing with rmsnorm_cute")
-
-        node.replace_all_uses_with(new_node)
-        gm.graph.erase_node(node)
+    node.replace_all_uses_with(new_node)
+    gm.graph.erase_node(node)
