@@ -18,7 +18,8 @@ def f(x):
     x = x * 4
     x = x + 3
     x = search(x)
-    return F.sigmoid(x)
+    x = x - 3
+    return x
 
 
 class _CustomPass(PatternMatcherPass):
@@ -53,7 +54,7 @@ with config.patch(
         search,
         replace,
         my_args,
-        joint_fwd_bwd,
+        fwd_only,
         [config.post_grad_custom_post_pass],
         extra_check=extra_check,
     )
@@ -61,7 +62,7 @@ with config.patch(
     compiled_f = torch.compile(f, dynamic=True)
 
     x = torch.randn([8, 8], device=device)
-    x = x.detach().requires_grad_()
+    x = x.detach()  # .requires_grad_()
 
     x_clone = x.clone().detach().requires_grad_()
 
