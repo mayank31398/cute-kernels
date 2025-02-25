@@ -1,4 +1,9 @@
-from .cute_inductor import CuteInductor, ReplacementConfig, parse_args_and_kwargs_to_kwargs
+from .cute_inductor import (
+    CuteInductor,
+    ReplacementConfig,
+    parse_args_and_kwargs_to_kwargs,
+    swiglu_unchunked_replacement_config,
+)
 from .cutotune import (
     CutoTuneConfig,
     CutoTuneParameter,

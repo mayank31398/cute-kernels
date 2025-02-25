@@ -1,5 +1,4 @@
 from copy import deepcopy
-from dataclasses import dataclass
 from typing import Callable
 
 import torch
@@ -7,6 +6,7 @@ from torch._dynamo import lookup_backend
 from torch.fx import replace_pattern
 
 from ..utils import enable_cute_tracing, get_boolean_env_variable
+from .config import ReplacementConfig
 
 
 _DEBUG_CUTEINDUCTOR = get_boolean_env_variable("DEBUG_CUTEINDUCTOR", True)
@@ -16,14 +16,6 @@ class _GraphCaptureDummyCompiler:
     def compiler(self, gm: torch.fx.GraphModule, example_inputs: list[torch.Tensor]) -> Callable:
         self.gm = gm
         return gm.forward
-
-
-@dataclass
-class ReplacementConfig:
-    search_function: Callable
-    replacement_function: Callable
-    example_inputs: tuple[torch.Tensor]
-    prepare_inputs_function: Callable
 
 
 class CuteInductor:

@@ -1,0 +1,1 @@
+from .swiglu_unchunked import swiglu_unchunked_replacement_config
