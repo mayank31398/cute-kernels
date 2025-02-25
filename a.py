@@ -91,7 +91,7 @@ class CuteInductor:
         return compiled
 
 
-device = "cpu"
+device = torch.cuda.current_device()
 
 
 compiled_f = torch.compile(
