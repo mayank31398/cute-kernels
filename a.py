@@ -3,25 +3,16 @@ from dataclasses import dataclass
 from typing import Callable
 
 import torch
-import torch.nn.functional as F
 from torch._dynamo import lookup_backend
 from torch.fx import replace_pattern
 
-
-def search(x: torch.Tensor) -> torch.Tensor:
-    x = x.chunk(2, dim=-1)
-    return x[0] * F.silu(x[1])
-
-
-def replace(x: torch.Tensor) -> torch.Tensor:
-    x = x.chunk(2, dim=-1)
-    return F.relu(x[0]) + F.relu(-x[1])
+from cute_kernels import swiglu_unchunked_cute, swiglu_unchunked_torch
 
 
 def f(x):
     x = x * 4
     x = x + 3
-    x = search(x)
+    x = swiglu_unchunked_torch(x)
     x = x - 3
     return x
 
@@ -108,8 +99,8 @@ compiled_f = torch.compile(
     backend=CuteInductor(
         replacement_configs=[
             ReplacementConfig(
-                search_function=search,
-                replacement_function=replace,
+                search_function=swiglu_unchunked_torch,
+                replacement_function=swiglu_unchunked_cute,
                 example_inputs=torch.randn(8, 8, device=device),
                 prepare_inputs_function=prepare_inputs_function,
             )
