@@ -9,7 +9,13 @@ from ..utils import parse_args_and_kwargs_to_kwargs
 
 
 def _get_example_inputs() -> list[dict]:
-    return [{"x": torch.randn(4, 4, device=torch.cuda.current_device())}]
+    return [
+        {
+            "x": torch.randn(4, 4, device=torch.cuda.current_device()),
+            "weight": torch.randn(4, device=torch.cuda.current_device()),
+            "eps": None,
+        }
+    ]
 
 
 rmsnorm_replacement_config = ReplacementConfig(
