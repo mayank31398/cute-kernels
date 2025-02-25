@@ -79,7 +79,6 @@ class CuteInductor:
 
                 if match:
                     with gm.graph.inserting_after(graph_node):
-                        print(graph_node)
                         kwargs = parse_args_and_kwargs_to_kwargs(
                             ["input", "chunks", "dim"], graph_node.args, graph_node.kwargs
                         )
