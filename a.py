@@ -5,7 +5,7 @@ from typing import Callable
 import torch
 import torch.nn.functional as F
 from torch._dynamo import lookup_backend
-from torch.fx import Node
+from torch.fx import Node, replace_pattern
 
 
 def search(x: torch.Tensor) -> torch.Tensor:
@@ -67,13 +67,17 @@ class CuteInductor:
     ) -> None:
         self.replacement_configs = deepcopy(replacement_configs)
 
+        graph_capture = GraphCapture()
+
         for replacement_config in self.replacement_configs:
             example_inputs = replacement_config.example_inputs
             example_inputs = example_inputs if isinstance(example_inputs, tuple) else (example_inputs,)
 
-            graph_capture = GraphCapture()
             torch.compile(replacement_config.search_function, backend=graph_capture.compiler)(*example_inputs)
-            replacement_config.graph = graph_capture.gm.graph
+            replacement_config.search_graph = graph_capture.gm.graph
+
+            torch.compile(replacement_config.replacement_function, backend=graph_capture.compiler)(*example_inputs)
+            replacement_config.replacement_graph = graph_capture.gm.graph
 
         self.use_torch_inductor_after_cute_inductor = use_torch_inductor_after_cute_inductor
 
@@ -86,19 +90,7 @@ class CuteInductor:
                 continue
 
             for replacement_config in self.replacement_configs:
-                match, output_nodes = self._match_subgraph(graph_node, next(iter(replacement_config.graph.nodes)))
-
-                if match:
-                    with gm.graph.inserting_after(graph_node):
-                        kwargs = replacement_config.prepare_inputs_function(graph_node.args, graph_node.kwargs)
-                        new_node = gm.graph.call_function(replacement_config.replacement_function, kwargs=kwargs)
-
-                    graph_node.replace_all_uses_with(new_node)
-                    for output_node in output_nodes:
-                        output_node.replace_all_uses_with(new_node)
-
-                    gm.graph.erase_node(graph_node)
-                    gm.graph.eliminate_dead_code()
+                replace_pattern(gm, replacement_config.search_graph, replacement_config.replacement_graph)
 
         print("-" * 50 + "\ngraph after cute inductor\n" + "-" * 50)
         gm.print_readable()
@@ -110,37 +102,6 @@ class CuteInductor:
             compiled = gm.forward
 
         return compiled
-
-    def _match_subgraph(self, graph_node: Node, search_node: Node) -> tuple[bool, list[Node]]:
-        child_matches = []
-        output_nodes = []
-
-        if search_node.op == "output":
-            return True, [graph_node.prev]
-
-        if search_node.op == "placeholder":
-            for sn in search_node.users.keys():
-                child_match, _output_nodes = self._match_subgraph(graph_node, sn)
-
-                child_matches.append(child_match)
-                output_nodes.extend(_output_nodes)
-
-            return all(child_matches), output_nodes
-
-        if (
-            graph_node.op != search_node.op
-            or graph_node.target != search_node.target
-            or len(graph_node.users) != len(search_node.users)
-        ):
-            return False, []
-
-        for gn, sn in zip(graph_node.users, search_node.users):
-            child_match, _output_nodes = self._match_subgraph(gn, sn)
-
-            child_matches.append(child_match)
-            output_nodes.extend(_output_nodes)
-
-        return all(child_matches), output_nodes
 
 
 device = "cpu"
