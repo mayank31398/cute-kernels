@@ -14,11 +14,11 @@ _DEBUG_CUTEINDUCTOR = get_boolean_env_variable("DEBUG_CUTEINDUCTOR", True)
 class CuteInductor:
     def __init__(
         self,
+        graphs: dict,
         use_torch_inductor_after_cute_inductor: bool = True,
-        replace_functions=[replace_rmsnorm, replace_swiglu_unchunked],
     ) -> None:
         self.use_torch_inductor_after_cute_inductor = use_torch_inductor_after_cute_inductor
-        self.replace_functions = replace_functions
+        self.graphs = graphs
 
     def compiler(self, gm: torch.fx.GraphModule, example_inputs: list[torch.Tensor]) -> Callable:
         with enable_cute_tracing():
@@ -26,9 +26,15 @@ class CuteInductor:
                 print("graph before cute inductor")
                 gm.print_readable()
 
-            for replace_function in self.replace_functions:
-                for node in gm.graph.nodes:
-                    replace_function(gm, node)
+            for search_graph in self.graphs.values():
+                search_graph: torch.fx.GraphModule
+
+                for node in search_graph.graph.nodes:
+                    print(node)
+
+            # for replace_function in self.replace_functions:
+            #     for node in gm.graph.nodes:
+            #         replace_function(gm, node)
 
             if _DEBUG_CUTEINDUCTOR:
                 print("graph after cute inductor")

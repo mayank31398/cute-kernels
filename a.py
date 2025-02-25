@@ -1,7 +1,11 @@
+from copy import deepcopy
+from dataclasses import dataclass
+from typing import Callable
+
 import torch
-import torch._inductor.config as config
 import torch.nn.functional as F
-from torch._inductor.pattern_matcher import PatternMatcherPass, fwd_only, joint_fwd_bwd, register_replacement
+from torch._dynamo import lookup_backend
+from torch.fx import Node
 
 
 def search(x: torch.Tensor) -> torch.Tensor:
@@ -22,43 +26,126 @@ def f(x):
     return x
 
 
-class _CustomPass(PatternMatcherPass):
-    def __init__(self) -> None:
-        super().__init__()
+def parse_args_and_kwargs_to_kwargs(signature: list[str], args: list, kwargs: dict) -> dict:
+    result = {}
+    for key, value in zip(signature, args):
+        result[key] = value
 
-    def __call__(self, g: torch.fx.graph.Graph):
-        print(g)
-        self.apply(g)
-        print(g)
+    for key, value in kwargs.items():
+        result[key] = value
+
+    return result
+
+
+class GraphCapture:
+    def compiler(self, gm: torch.fx.GraphModule, example_inputs: list[torch.Tensor]) -> Callable:
+        self.gm = gm
+        return gm.forward
+
+
+@dataclass
+class ReplacementConfig:
+    search_function: Callable
+    replacement_function: Callable
+    example_inputs: tuple[torch.Tensor]
+
+
+class CuteInductor:
+    def __init__(
+        self, replacement_configs: list[ReplacementConfig], use_torch_inductor_after_cute_inductor: bool = True
+    ) -> None:
+        self.replacement_configs = deepcopy(replacement_configs)
+
+        for replacement_config in self.replacement_configs:
+            example_inputs = replacement_config.example_inputs
+            example_inputs = example_inputs if isinstance(example_inputs, tuple) else (example_inputs,)
+
+            graph_capture = GraphCapture()
+            torch.compile(replacement_config.search_function, backend=graph_capture.compiler)(*example_inputs)
+            replacement_config.graph = graph_capture.gm.graph
+
+        self.use_torch_inductor_after_cute_inductor = use_torch_inductor_after_cute_inductor
+
+    def compiler(self, gm: torch.fx.GraphModule, example_inputs: list[torch.Tensor]) -> Callable:
+        print("graph before cute inductor")
+        gm.print_readable()
+
+        for graph_node in gm.graph.nodes:
+            for replacement_config in self.replacement_configs:
+                match, output_nodes = self._match_subgraph(graph_node, next(iter(replacement_config.graph.nodes)))
+
+                if match:
+                    with gm.graph.inserting_after(graph_node):
+                        kwargs = parse_args_and_kwargs_to_kwargs(
+                            ["input", "chunks", "dim"], graph_node.args, graph_node.kwargs
+                        )
+
+                        kwargs["x"] = kwargs.pop("input")
+                        kwargs.pop("chunks")
+                        kwargs.pop("dim")
+
+                        new_node = gm.graph.call_function(replacement_config.replacement_function, kwargs=kwargs)
+
+                    print("replacing with rmsnorm_cute")
+
+                    graph_node.replace_all_uses_with(new_node)
+                    for output_node in output_nodes:
+                        output_node.replace_all_uses_with(new_node)
+
+                    gm.graph.erase_node(graph_node)
+                    gm.graph.eliminate_dead_code()
+
+        print("graph after cute inductor")
+        gm.print_readable()
+
+        if self.use_torch_inductor_after_cute_inductor:
+            inductor = lookup_backend("inductor")
+            compiled = inductor(gm, example_inputs)
+        else:
+            compiled = gm.forward
+
+        return compiled
+
+    def _match_subgraph(self, graph_node: Node, search_node: Node) -> tuple[bool, list[Node]]:
+        if search_node.op == "output":
+            return True, [graph_node.prev]
+
+        if graph_node.op == "placeholder":
+            return self._match_subgraph(list(graph_node.users.keys())[0], search_node)
+
+        if search_node.op == "placeholder":
+            return self._match_subgraph(graph_node, list(search_node.users.keys())[0])
+
+        if graph_node.op != search_node.op:
+            return False, []
+
+        if graph_node.target != search_node.target:
+            return False, []
+
+        if len(graph_node.users) != len(search_node.users):
+            return False, []
+
+        child_matches = []
+        output_nodes = []
+        for gn, sn in zip(graph_node.users, search_node.users):
+            child_match, _output_nodes = self._match_subgraph(gn, sn)
+
+            child_matches.append(child_match)
+            output_nodes.extend(_output_nodes)
+
+        return all(child_matches), output_nodes
 
 
 device = "cpu"
 
 
-with config.patch(
-    pattern_matcher=False,
-    # define pattern match as custom post grad opt pass
-    post_grad_custom_pre_pass=None,
-    post_grad_custom_post_pass=_CustomPass(),
-):
-    my_args = [torch.empty([10, 10], device=device, requires_grad=True)]
-
-    register_replacement(
-        search,
-        replace,
-        my_args,
-        fwd_only,
-        [config.post_grad_custom_post_pass],
-    )
-
-    compiled_f = torch.compile(f, dynamic=True)
-
-    x = torch.randn([8, 8], device=device)
-    x = x.detach()  # .requires_grad_()
-
-    x_clone = x.clone().detach().requires_grad_()
-
-    z = compiled_f(x)
-    z_clone = f(x_clone)
-
-    print(z - z_clone)
+compiled_f = torch.compile(
+    f,
+    backend=CuteInductor(
+        replacement_configs=[
+            ReplacementConfig(
+                search_function=search, replacement_function=replace, example_inputs=torch.randn(8, 8, device=device)
+            )
+        ]
+    ).compiler,
+)(torch.randn(8, 8, device=device))
