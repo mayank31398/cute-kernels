@@ -14,7 +14,7 @@ def f(x):
     x = x + 3
     x = swiglu_unchunked_torch(x)
     x = x - 3
-    x = rmsnorm_torch(x)
+    x = rmsnorm_torch(x, torch.randn(x.size(-1), device=x.device), eps=1e-5)
     return x
 
 
