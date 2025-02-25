@@ -5,7 +5,7 @@ from typing import Callable
 import torch
 import torch.nn.functional as F
 from torch._dynamo import lookup_backend
-from torch.fx import Node, replace_pattern
+from torch.fx import replace_pattern
 
 
 def search(x: torch.Tensor) -> torch.Tensor:
