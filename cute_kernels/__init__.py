@@ -2,6 +2,7 @@ from .cute_inductor import (
     CuteInductor,
     ReplacementConfig,
     parse_args_and_kwargs_to_kwargs,
+    rmsnorm_replacement_config,
     swiglu_unchunked_replacement_config,
 )
 from .cutotune import (

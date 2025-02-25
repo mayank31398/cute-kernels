@@ -1,1 +1,2 @@
+from .rmsnorm import rmsnorm_replacement_config
 from .swiglu_unchunked import swiglu_unchunked_replacement_config
