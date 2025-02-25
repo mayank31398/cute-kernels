@@ -43,11 +43,22 @@ class GraphCapture:
         return gm.forward
 
 
+def prepare_inputs_function(args: list, kwargs: dict) -> dict:
+    kwargs = parse_args_and_kwargs_to_kwargs(["input", "chunks", "dim"], args, kwargs)
+
+    kwargs["x"] = kwargs.pop("input")
+    kwargs.pop("chunks")
+    kwargs.pop("dim")
+
+    return kwargs
+
+
 @dataclass
 class ReplacementConfig:
     search_function: Callable
     replacement_function: Callable
     example_inputs: tuple[torch.Tensor]
+    prepare_inputs_function: Callable
 
 
 class CuteInductor:
@@ -79,17 +90,8 @@ class CuteInductor:
 
                 if match:
                     with gm.graph.inserting_after(graph_node):
-                        kwargs = parse_args_and_kwargs_to_kwargs(
-                            ["input", "chunks", "dim"], graph_node.args, graph_node.kwargs
-                        )
-
-                        kwargs["x"] = kwargs.pop("input")
-                        kwargs.pop("chunks")
-                        kwargs.pop("dim")
-
+                        kwargs = replacement_config.prepare_inputs_function(graph_node.args, graph_node.kwargs)
                         new_node = gm.graph.call_function(replacement_config.replacement_function, kwargs=kwargs)
-
-                    print("replacing with rmsnorm_cute")
 
                     graph_node.replace_all_uses_with(new_node)
                     for output_node in output_nodes:
@@ -149,7 +151,10 @@ compiled_f = torch.compile(
     backend=CuteInductor(
         replacement_configs=[
             ReplacementConfig(
-                search_function=search, replacement_function=replace, example_inputs=torch.randn(8, 8, device=device)
+                search_function=search,
+                replacement_function=replace,
+                example_inputs=torch.randn(8, 8, device=device),
+                prepare_inputs_function=prepare_inputs_function,
             )
         ]
     ).compiler,
