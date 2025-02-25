@@ -6,7 +6,7 @@ import torch
 from torch._dynamo import lookup_backend
 from torch.fx import replace_pattern
 
-from cute_kernels import swiglu_unchunked_cute, swiglu_unchunked_torch
+from cute_kernels import parse_args_and_kwargs_to_kwargs, swiglu_unchunked_cute, swiglu_unchunked_torch
 
 
 def f(x):
@@ -15,17 +15,6 @@ def f(x):
     x = swiglu_unchunked_torch(x)
     x = x - 3
     return x
-
-
-def parse_args_and_kwargs_to_kwargs(signature: list[str], args: list, kwargs: dict) -> dict:
-    result = {}
-    for key, value in zip(signature, args):
-        result[key] = value
-
-    for key, value in kwargs.items():
-        result[key] = value
-
-    return result
 
 
 class GraphCapture:
