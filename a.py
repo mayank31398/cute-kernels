@@ -85,12 +85,8 @@ class CuteInductor:
         print("-" * 50 + "\ngraph before cute inductor\n" + "-" * 50)
         gm.print_readable()
 
-        for graph_node in gm.graph.nodes:
-            if graph_node.op == "placeholder":
-                continue
-
-            for replacement_config in self.replacement_configs:
-                replace_pattern(gm, replacement_config.search_graph, replacement_config.replacement_graph)
+        for replacement_config in self.replacement_configs:
+            replace_pattern(gm, replacement_config.search_graph, replacement_config.replacement_graph)
 
         print("-" * 50 + "\ngraph after cute inductor\n" + "-" * 50)
         gm.print_readable()
