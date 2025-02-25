@@ -71,11 +71,15 @@ class CuteInductor:
         gm.print_readable()
 
         for graph_node in gm.graph.nodes:
+            if graph_node.op == "placeholder":
+                continue
+
             for replacement_config in self.replacement_configs:
                 match, output_nodes = self._match_subgraph(graph_node, next(iter(replacement_config.graph.nodes)))
 
                 if match:
                     with gm.graph.inserting_after(graph_node):
+                        print(graph_node)
                         kwargs = parse_args_and_kwargs_to_kwargs(
                             ["input", "chunks", "dim"], graph_node.args, graph_node.kwargs
                         )
@@ -107,26 +111,28 @@ class CuteInductor:
         return compiled
 
     def _match_subgraph(self, graph_node: Node, search_node: Node) -> tuple[bool, list[Node]]:
+        child_matches = []
+        output_nodes = []
+
         if search_node.op == "output":
             return True, [graph_node.prev]
 
-        if graph_node.op == "placeholder":
-            return self._match_subgraph(list(graph_node.users.keys())[0], search_node)
-
         if search_node.op == "placeholder":
-            return self._match_subgraph(graph_node, list(search_node.users.keys())[0])
+            for sn in search_node.users.keys():
+                child_match, _output_nodes = self._match_subgraph(graph_node, sn)
 
-        if graph_node.op != search_node.op:
+                child_matches.append(child_match)
+                output_nodes.extend(_output_nodes)
+
+            return all(child_matches), output_nodes
+
+        if (
+            graph_node.op != search_node.op
+            or graph_node.target != search_node.target
+            or len(graph_node.users) != len(search_node.users)
+        ):
             return False, []
 
-        if graph_node.target != search_node.target:
-            return False, []
-
-        if len(graph_node.users) != len(search_node.users):
-            return False, []
-
-        child_matches = []
-        output_nodes = []
         for gn, sn in zip(graph_node.users, search_node.users):
             child_match, _output_nodes = self._match_subgraph(gn, sn)
 
