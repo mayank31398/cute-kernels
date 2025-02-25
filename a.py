@@ -67,7 +67,7 @@ class CuteInductor:
         self.use_torch_inductor_after_cute_inductor = use_torch_inductor_after_cute_inductor
 
     def compiler(self, gm: torch.fx.GraphModule, example_inputs: list[torch.Tensor]) -> Callable:
-        print("graph before cute inductor")
+        print("-" * 50 + "\ngraph before cute inductor\n" + "-" * 50)
         gm.print_readable()
 
         for graph_node in gm.graph.nodes:
@@ -98,7 +98,7 @@ class CuteInductor:
                     gm.graph.erase_node(graph_node)
                     gm.graph.eliminate_dead_code()
 
-        print("graph after cute inductor")
+        print("-" * 50 + "\ngraph after cute inductor\n" + "-" * 50)
         gm.print_readable()
 
         if self.use_torch_inductor_after_cute_inductor:
