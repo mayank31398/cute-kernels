@@ -8,5 +8,5 @@ import torch
 class ReplacementConfig:
     search_function: Callable
     replacement_function: Callable
-    example_inputs: tuple[torch.Tensor]
+    example_inputs_function: Callable
     prepare_inputs_function: Callable

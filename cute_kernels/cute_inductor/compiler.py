@@ -27,8 +27,7 @@ class CuteInductor:
         graph_capture = _GraphCaptureDummyCompiler()
 
         for replacement_config in self.replacement_configs:
-            example_inputs = replacement_config.example_inputs
-            example_inputs = example_inputs if isinstance(example_inputs, tuple) else (example_inputs,)
+            example_inputs = replacement_config.example_inputs_function()
 
             torch.compile(replacement_config.search_function, backend=graph_capture.compiler)(*example_inputs)
             replacement_config.search_graph = graph_capture.gm.graph

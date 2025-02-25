@@ -15,9 +15,13 @@ def _prepare_inputs_function(args: list, kwargs: dict) -> dict:
     return kwargs
 
 
+def _get_example_inputs() -> list[dict]:
+    return [{"x": torch.randn(4, 4, device=torch.cuda.current_device())}]
+
+
 swiglu_unchunked_replacement_config = ReplacementConfig(
     search_function=swiglu_unchunked_torch,
     replacement_function=swiglu_unchunked_cute,
-    example_inputs=torch.randn(4, 4, device=torch.cuda.current_device()),
+    example_inputs_function=_get_example_inputs,
     prepare_inputs_function=_prepare_inputs_function,
 )
