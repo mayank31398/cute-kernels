@@ -1,4 +1,4 @@
-from .cute_inductor import CuteInductor, parse_args_and_kwargs_to_kwargs
+from .cute_inductor import CuteInductor, ReplacementConfig, parse_args_and_kwargs_to_kwargs
 from .cutotune import (
     CutoTuneConfig,
     CutoTuneParameter,

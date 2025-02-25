@@ -1,43 +1,62 @@
+from copy import deepcopy
+from dataclasses import dataclass
 from typing import Callable
 
 import torch
 from torch._dynamo import lookup_backend
+from torch.fx import replace_pattern
 
 from ..utils import enable_cute_tracing, get_boolean_env_variable
-from .rmsnorm import replace_rmsnorm
-from .swiglu_unchunked import replace_swiglu_unchunked
 
 
 _DEBUG_CUTEINDUCTOR = get_boolean_env_variable("DEBUG_CUTEINDUCTOR", True)
 
 
+class _GraphCaptureDummyCompiler:
+    def compiler(self, gm: torch.fx.GraphModule, example_inputs: list[torch.Tensor]) -> Callable:
+        self.gm = gm
+        return gm.forward
+
+
+@dataclass
+class ReplacementConfig:
+    search_function: Callable
+    replacement_function: Callable
+    example_inputs: tuple[torch.Tensor]
+    prepare_inputs_function: Callable
+
+
 class CuteInductor:
     def __init__(
-        self,
-        graphs: dict,
-        use_torch_inductor_after_cute_inductor: bool = True,
+        self, replacement_configs: list[ReplacementConfig], use_torch_inductor_after_cute_inductor: bool = True
     ) -> None:
+        self.replacement_configs = deepcopy(replacement_configs)
+
+        graph_capture = _GraphCaptureDummyCompiler()
+
+        for replacement_config in self.replacement_configs:
+            example_inputs = replacement_config.example_inputs
+            example_inputs = example_inputs if isinstance(example_inputs, tuple) else (example_inputs,)
+
+            torch.compile(replacement_config.search_function, backend=graph_capture.compiler)(*example_inputs)
+            replacement_config.search_graph = graph_capture.gm.graph
+
+            torch.compile(replacement_config.replacement_function, backend=graph_capture.compiler)(*example_inputs)
+            replacement_config.replacement_graph = graph_capture.gm.graph
+
         self.use_torch_inductor_after_cute_inductor = use_torch_inductor_after_cute_inductor
-        self.graphs = graphs
 
     def compiler(self, gm: torch.fx.GraphModule, example_inputs: list[torch.Tensor]) -> Callable:
         with enable_cute_tracing():
             if _DEBUG_CUTEINDUCTOR:
-                print("graph before cute inductor")
+                print("-" * 50 + "\ngraph before cute inductor\n" + "-" * 50)
                 gm.print_readable()
 
-            for search_graph in self.graphs.values():
-                search_graph: torch.fx.GraphModule
-
-                for node in search_graph.graph.nodes:
-                    print(node)
-
-            # for replace_function in self.replace_functions:
-            #     for node in gm.graph.nodes:
-            #         replace_function(gm, node)
+            for replacement_config in self.replacement_configs:
+                replace_pattern(gm, replacement_config.search_graph, replacement_config.replacement_graph)
 
             if _DEBUG_CUTEINDUCTOR:
-                print("graph after cute inductor")
+                print("-" * 50 + "\ngraph after cute inductor\n" + "-" * 50)
                 gm.print_readable()
 
             if self.use_torch_inductor_after_cute_inductor:
