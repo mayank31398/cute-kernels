@@ -3,6 +3,7 @@ import torch
 from cute_kernels import (
     CuteInductor,
     rmsnorm_replacement_config,
+    rmsnorm_torch,
     swiglu_unchunked_replacement_config,
     swiglu_unchunked_torch,
 )
@@ -13,6 +14,7 @@ def f(x):
     x = x + 3
     x = swiglu_unchunked_torch(x)
     x = x - 3
+    x = rmsnorm_torch(x)
     return x
 
 
