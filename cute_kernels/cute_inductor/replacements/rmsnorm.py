@@ -14,7 +14,12 @@ def _get_example_inputs() -> list[dict]:
             "x": torch.randn(4, 4, device=torch.cuda.current_device()),
             "weight": torch.randn(4, device=torch.cuda.current_device()),
             "eps": None,
-        }
+        },
+        {
+            "x": torch.randn(4, 4, device=torch.cuda.current_device()),
+            "weight": None,
+            "eps": None,
+        },
     ]
 
 
