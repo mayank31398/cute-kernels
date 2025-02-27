@@ -20,7 +20,10 @@ class _GraphCaptureDummyCompiler:
 
 class CuteInductor:
     def __init__(
-        self, replacement_configs: list[ReplacementConfig], use_torch_inductor_after_cute_inductor: bool = True
+        self,
+        replacement_configs: list[ReplacementConfig],
+        use_torch_inductor_after_cute_inductor: bool = True,
+        dynamic: bool = False,
     ) -> None:
         self.replacement_configs = deepcopy(replacement_configs)
 
