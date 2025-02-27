@@ -28,15 +28,14 @@ class CuteInductor:
 
         with torch.inference_mode():
             for replacement_config in self.replacement_configs:
-                example_inputs = replacement_config.example_inputs_function()
+                for example_inputs in replacement_config.example_inputs_function():
+                    torch.compile(replacement_config.search_function, backend=graph_capture.compiler)(**example_inputs)
+                    replacement_config.search_graph = graph_capture.gm.graph
 
-                torch.compile(replacement_config.search_function, backend=graph_capture.compiler)(**example_inputs[0])
-                replacement_config.search_graph = graph_capture.gm.graph
-
-                torch.compile(replacement_config.replacement_function, backend=graph_capture.compiler)(
-                    **example_inputs[0]
-                )
-                replacement_config.replacement_graph = graph_capture.gm.graph
+                    torch.compile(replacement_config.replacement_function, backend=graph_capture.compiler)(
+                        **example_inputs
+                    )
+                    replacement_config.replacement_graph = graph_capture.gm.graph
 
         self.use_torch_inductor_after_cute_inductor = use_torch_inductor_after_cute_inductor
 
