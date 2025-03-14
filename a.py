@@ -11,11 +11,9 @@ def _add_scalar_tilelang_kernel(
     @T.prim_func
     def main(x: T.Buffer((num_elements,), dtype), output: T.Buffer((num_elements,), dtype)):
         with T.Kernel(T.ceildiv(num_elements, BLOCK_SIZE), 1, 1, threads=num_threads) as (bx, by, bz):
-            registers = T.alloc_fragment(BLOCK_SIZE, dtype)
-            T.copy(x[bx * BLOCK_SIZE], registers)
-
             for i in T.Parallel(BLOCK_SIZE):
-                output[bx * BLOCK_SIZE + i] = registers[i] + y
+                if bx * BLOCK_SIZE + i < num_elements:
+                    output[bx * BLOCK_SIZE + i] = x[bx * BLOCK_SIZE + i] + y
 
     return main
 
