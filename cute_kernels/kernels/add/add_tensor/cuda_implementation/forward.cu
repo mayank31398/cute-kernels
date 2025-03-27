@@ -5,6 +5,7 @@
 #include "include/cute_kernels.h"
 
 namespace ck = cute_kernels;
+namespace ck_mem = ck::memory;
 
 using fp32 = ck::fp32;
 using fp32_2 = ck::fp32_2;
@@ -18,40 +19,30 @@ __global__ void _add_tensor_cuda_kernel(const scalar_t *x,
                                         const scalar_t *y,
                                         scalar_t *output,
                                         const uint64 num_elements) {
-    constexpr int num_elements_per_thread = 16 / sizeof(scalar_t);
-    static_assert(num_elements_per_thread == 4 || num_elements_per_thread == 8);
-
-    using dtype = ck::DType<scalar_t>;
-    using T = typename dtype::nv_dtype;
-    using T2 = typename dtype::nv_dtype2;
+    constexpr uint32 num_elements_per_thread = ck_mem::Packed128<scalar_t>::size;
 
     const uint32 thread_id = ck::get_global_thread_id();
-    const uint32 num_elements4 = num_elements / num_elements_per_thread;
+    const uint32 num_vector_elements = num_elements / num_elements_per_thread;
 
-    if (thread_id < num_elements4) {
-        const fp32 *x_vec = (fp32 *)&((fp32_4 *)x)[thread_id];
-        const fp32 *y_vec = (fp32 *)&((fp32_4 *)y)[thread_id];
-        fp32 output_buffer[4];
+    if (thread_id < num_vector_elements) {
+        const ck_mem::Packed128<const scalar_t> x_vec =
+            reinterpret_cast<const ck_mem::Packed128<const scalar_t> *>(x)[thread_id];
+        const ck_mem::Packed128<const scalar_t> y_vec =
+            reinterpret_cast<const ck_mem::Packed128<const scalar_t> *>(y)[thread_id];
+        scalar_t output_buffer[num_elements_per_thread];
 
         // clang-format off
         #pragma unroll
         // clang-format on
-        for (int i = 0; i < 4; i++) {
-            if constexpr (std::is_same_v<scalar_t, fp32>) {
-                output_buffer[i] = x_vec[i] + y_vec[i];
-            } else {
-                T2 _x = dtype::reinterpret_32_bits_as_2x16(x_vec[i]);
-                T2 _y = dtype::reinterpret_32_bits_as_2x16(y_vec[i]);
-
-                _x = __hadd2(_x, _y);
-                output_buffer[i] = dtype::reinterpret_2x16_as_32_bits(_x);
-            }
+        for (uint32 i = 0; i < num_elements_per_thread; i++) {
+            output_buffer[i] = x_vec[i] + y_vec[i];
         }
 
-        ((fp32_4 *)output)[thread_id] = ck::DType<fp32>::make4(output_buffer);
+        ck_mem::store128<scalar_t>(
+            output, reinterpret_cast<ck_mem::Packed128<scalar_t> *>(output_buffer)[0], thread_id);
     }
 
-    const uint32 index = num_elements4 * num_elements_per_thread + thread_id;
+    const uint32 index = num_vector_elements * num_elements_per_thread + thread_id;
     if (index < num_elements) {
         output[index] = x[index] + y[index];
     }
