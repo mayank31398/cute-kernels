@@ -8,25 +8,39 @@ namespace ck = cute_kernels;
 namespace ck_mem = ck::memory;
 
 using fp32 = ck::fp32;
+using fp32_4 = ck::fp32_4;
 using uint32 = ck::uint32;
 using uint64 = ck::uint64;
+
+template <typename T, typename vecT>
+inline __device__ T *load_128_bits(T *array, const uint64 &index) {
+    vecT *vector_array = reinterpret_cast<vecT *>(array);
+    vecT vector_element = vector_array[index];
+    return reinterpret_cast<T *>(vector_element);
+}
+
+template <typename T, typename vecT>
+inline __device__ T *store_128_bits(T *source, T *destination, const uint64 &index) {
+    vecT *destination_vector_array = reinterpret_cast<vecT *>(destination);
+    vecT source_vector = reinterpret_cast<vecT>(source);
+    destination_vector_array[index] = source_vector;
+}
 
 template <typename scalar_t>
 __global__ void _add_tensor_cuda_kernel(const scalar_t *x,
                                         const scalar_t *y,
                                         scalar_t *output,
                                         const uint64 num_elements) {
-    constexpr uint32 num_elements_per_thread = ck_mem::Packed128<scalar_t>::size;
-    constexpr uint32 increment = 4 / sizeof(scalar_t);
+    constexpr uint32 num_elements_per_thread = 16 / sizeof(scalar_t);
+    constexpr uint32 increment = num_elements_per_thread / 4;
 
     const uint32 thread_id = blockIdx.x * blockDim.x + threadIdx.x;
     const uint32 num_vector_elements = num_elements / num_elements_per_thread;
 
     if (thread_id < num_vector_elements) {
-        // packed array allows loading using vector loads, its just a syntactic sugar
-        const ck_mem::Packed128<const scalar_t> x_vec = ck_mem::Packed128Array<const scalar_t>(x)[thread_id];
-        const ck_mem::Packed128<const scalar_t> y_vec = ck_mem::Packed128Array<const scalar_t>(y)[thread_id];
-        ck_mem::Packed128<scalar_t> output_buffer;
+        const scalar_t *x_vec = load_128_bits<const scalar_t, const fp32_4>(x, thread_id);
+        const scalar_t *y_vec = load_128_bits<const scalar_t, const fp32_4>(y, thread_id);
+        scalar_t output_buffer[num_elements_per_thread];
 
         for (uint32 i = 0; i < num_elements_per_thread; i += increment) {
             if constexpr (std::is_same_v<scalar_t, fp32>) {
@@ -45,8 +59,7 @@ __global__ void _add_tensor_cuda_kernel(const scalar_t *x,
             }
         }
 
-        ck_mem::Packed128Array<scalar_t> output_vec = ck_mem::Packed128Array<scalar_t>(output);
-        output_vec[thread_id] = output_buffer;
+        store_128_bits<scalar_t, fp32_4>(output_buffer, output, thread_id);
     }
 
     const uint32 index = num_vector_elements * num_elements_per_thread + thread_id;
