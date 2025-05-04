@@ -5,7 +5,12 @@ from ...math import divide_if_divisible
 from ...utils import ensure_contiguous, is_nvidia_gpu
 from .cuda_implementation import swiglu_backward_cuda, swiglu_forward_cuda
 from .torch_implementation import swiglu_torch
-from .triton_implementation import swiglu_backward_triton, swiglu_forward_triton, swiglu_packed_forward_triton
+from .triton_implementation import (
+    swiglu_backward_triton,
+    swiglu_forward_triton,
+    swiglu_packed_backward_triton,
+    swiglu_packed_forward_triton,
+)
 
 
 class _Swiglu_Cute(torch.autograd.Function):
