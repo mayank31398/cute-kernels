@@ -32,8 +32,6 @@ from .kernels import (
     softmax_torch,
     swiglu_cute,
     swiglu_torch,
-    swiglu_unchunked_cute,
-    swiglu_unchunked_torch,
     unpack_sequence_cute,
     unpack_sequence_torch,
 )
