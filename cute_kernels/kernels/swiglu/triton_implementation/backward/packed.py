@@ -2,14 +2,14 @@ import torch
 import triton
 import triton.language as tl
 
-from ....constants import LIBRARY_NAME
-from ....math import ceil_divide
-from ....triton_math import sigmoid
-from ....utils import cute_op, get_num_elements_and_hidden_size
+from .....constants import LIBRARY_NAME
+from .....math import ceil_divide
+from .....triton_math import sigmoid
+from .....utils import cute_op, get_num_elements_and_hidden_size
 
 
 @triton.jit
-def swiglu_unchunked_backward_triton_kernel(
+def swiglu_packed_backward_triton_kernel(
     x_ptr, output_grad_ptr, x_grad_ptr, B, H, BLOCK_SIZE_B: tl.constexpr, BLOCK_SIZE_H: tl.constexpr
 ):
     pid_b = tl.program_id(axis=0)
@@ -27,7 +27,7 @@ def swiglu_unchunked_backward_triton_kernel(
     up_ptrs = x_ptr + indices_b[:, None] * H + indices_h[None, :]
     up = tl.load(up_ptrs, mask=mask_bh)
 
-    gate_ptrs = up_ptrs + (H >> 1)
+    gate_ptrs = up_ptrs + half_H
     gate = tl.load(gate_ptrs, mask=mask_bh).to(tl.float32)
 
     output_grad_ptrs = output_grad_ptr + indices_b[:, None] * half_H + indices_h[None, :]
@@ -42,12 +42,12 @@ def swiglu_unchunked_backward_triton_kernel(
     up_grad_ptrs = x_grad_ptr + indices_b[:, None] * H + indices_h[None, :]
     tl.store(up_grad_ptrs, up_grad, mask=mask_bh)
 
-    gate_grad_ptrs = up_grad_ptrs + (H >> 1)
+    gate_grad_ptrs = up_grad_ptrs + half_H
     tl.store(gate_grad_ptrs, gate_grad, mask=mask_bh)
 
 
-@cute_op(f"{LIBRARY_NAME}::swiglu_unchunked_backward_triton", mutates_args={"x_grad"})
-def swiglu_unchunked_backward_triton(
+@cute_op(f"{LIBRARY_NAME}::swiglu_packed_backward_triton", mutates_args={"x_grad"})
+def swiglu_packed_backward_triton(
     x: torch.Tensor,
     output_grad: torch.Tensor,
     x_grad: torch.Tensor,
@@ -57,7 +57,7 @@ def swiglu_unchunked_backward_triton(
     B, H = get_num_elements_and_hidden_size(x)
 
     with torch.device(x.device):
-        swiglu_unchunked_backward_triton_kernel[ceil_divide(B, BLOCK_SIZE_B), ceil_divide(H, BLOCK_SIZE_H)](
+        swiglu_packed_backward_triton_kernel[ceil_divide(B, BLOCK_SIZE_B), ceil_divide(H, BLOCK_SIZE_H)](
             x_ptr=x,
             output_grad_ptr=output_grad,
             x_grad_ptr=x_grad,

@@ -1,11 +1,16 @@
 import torch
 
 from ...kernel_backend import KernelBackend, is_cuda_kernel_backend_allowed, is_triton_kernel_backend_allowed
-from ...math import ceil_divide
+from ...math import divide_if_divisible
 from ...utils import ensure_contiguous, is_nvidia_gpu
 from .cuda_implementation import swiglu_backward_cuda, swiglu_forward_cuda
-from .torch_implementation import swiglu_torch
-from .triton_implementation import swiglu_backward_triton, swiglu_forward_triton
+from .torch_implementation import swiglu_packed_torch, swiglu_torch
+from .triton_implementation import (
+    swiglu_backward_triton,
+    swiglu_forward_triton,
+    swiglu_packed_backward_triton,
+    swiglu_packed_forward_triton,
+)
 
 
 class _Swiglu_Cute(torch.autograd.Function):
@@ -84,6 +89,83 @@ class _Swiglu_Cute(torch.autograd.Function):
         return gate_grad, up_grad, *[None] * 8
 
 
+class _SwigluPacked_Cute(torch.autograd.Function):
+    @staticmethod
+    @ensure_contiguous
+    def forward(
+        ctx,
+        x: torch.Tensor,
+        kernel_backend_forward: KernelBackend,
+        BLOCK_SIZE_CUDA_forward: int,
+        BLOCK_SIZE_TRITON_forward: int,
+        NUM_WARPS_TRITON_forward: int,
+        kernel_backend_backward: KernelBackend,
+        BLOCK_SIZE_CUDA_backward: int,
+        BLOCK_SIZE_TRITON_backward: int,
+        NUM_WARPS_TRITON_backward: int,
+    ) -> torch.Tensor:
+        ctx.save_for_backward(x)
+        ctx.kernel_backend_backward = kernel_backend_backward
+        ctx.BLOCK_SIZE_CUDA_backward = BLOCK_SIZE_CUDA_backward
+        ctx.BLOCK_SIZE_TRITON_backward = BLOCK_SIZE_TRITON_backward
+        ctx.NUM_WARPS_TRITON_backward = NUM_WARPS_TRITON_backward
+
+        H = x.size(-1)
+        output = torch.empty(*x.size()[:-1], divide_if_divisible(H, 2), device=x.device, dtype=x.dtype)
+
+        gate, up = x.chunk(2, dim=-1)
+
+        if is_cuda_kernel_backend_allowed(kernel_backend_forward) and is_nvidia_gpu() and x.is_cuda:
+            swiglu_forward_cuda(gate=gate, up=up, output=output, BLOCK_SIZE=BLOCK_SIZE_CUDA_forward)
+        elif is_triton_kernel_backend_allowed(kernel_backend_forward):
+            swiglu_forward_triton(
+                gate=gate,
+                up=up,
+                output=output,
+                BLOCK_SIZE=BLOCK_SIZE_TRITON_forward,
+                NUM_WARPS=NUM_WARPS_TRITON_forward,
+            )
+        else:
+            raise ValueError("unexpected kernel_backend")
+
+        return output
+
+    @staticmethod
+    @ensure_contiguous
+    def backward(ctx, output_grad: torch.Tensor) -> tuple[torch.Tensor | None]:
+        x: torch.Tensor = ctx.saved_tensors[0]
+        x_grad = torch.empty_like(x)
+
+        gate, up = x.chunk(2, dim=-1)
+        gate_grad, up_grad = x_grad.chunk(2, dim=-1)
+
+        kernel_backend_backward = ctx.kernel_backend_backward
+
+        if is_cuda_kernel_backend_allowed(kernel_backend_backward) and is_nvidia_gpu() and x.is_cuda:
+            swiglu_backward_cuda(
+                gate=gate,
+                up=up,
+                output_grad=output_grad,
+                gate_grad=gate_grad,
+                up_grad=up_grad,
+                BLOCK_SIZE=ctx.BLOCK_SIZE_CUDA_backward,
+            )
+        elif is_triton_kernel_backend_allowed(kernel_backend_backward):
+            swiglu_backward_triton(
+                gate=gate,
+                up=up,
+                output_grad=output_grad,
+                gate_grad=gate_grad,
+                up_grad=up_grad,
+                BLOCK_SIZE=ctx.BLOCK_SIZE_TRITON_backward,
+                NUM_WARPS=ctx.NUM_WARPS_TRITON_backward,
+            )
+        else:
+            raise ValueError("unexpected kernel_backend")
+
+        return x_grad, *[None] * 8
+
+
 def swiglu_cute(
     gate: torch.Tensor,
     up: torch.Tensor,
@@ -128,4 +210,36 @@ def swiglu_cute(
         BLOCK_SIZE_CUDA_backward,
         BLOCK_SIZE_TRITON_backward,
         NUM_WARPS_TRITON_backward,
+    )
+
+
+def swiglu_packed_cute(
+    x: torch.Tensor,
+    *,
+    BLOCK_SIZE_B_forward: int = 64,
+    BLOCK_SIZE_H_forward: int = 64,
+    BLOCK_SIZE_B_backward: int = 64,
+    BLOCK_SIZE_H_backward: int = 64,
+) -> torch.Tensor:
+    """computes swiglu activation by splitting the tensor `x` into 2 parts: gate and up activations
+
+    Args:
+        x (torch.Tensor): input activation
+        kernel_backend_forward (KernelBackend, optional): kernel backend to prioritize. Defaults to
+            KernelBackend.cuda.
+        BLOCK_SIZE_CUDA_forward (int, optional): block size for CUDA backend. Defaults to 1024.
+        BLOCK_SIZE_TRITON_forward (int, optional): block size for triton backend. Defaults to 4096.
+        NUM_WARPS_TRITON_forward (int, optional): warps for triton backend. Defaults to 32.
+        kernel_backend_backward (KernelBackend, optional): kernel backend to prioritize. Defaults to
+            KernelBackend.cuda.
+        BLOCK_SIZE_CUDA_backward (int, optional): block size for CUDA backend. Defaults to 1024.
+        BLOCK_SIZE_TRITON_backward (int, optional): block size for triton backend. Defaults to 4096.
+        NUM_WARPS_TRITON_backward (int, optional): warps for triton backend. Defaults to 32.
+
+    Returns:
+        torch.Tensor: output tensor
+    """
+
+    return _SwigluPacked_Cute.apply(
+        x, BLOCK_SIZE_B_forward, BLOCK_SIZE_H_forward, BLOCK_SIZE_B_backward, BLOCK_SIZE_H_backward
     )
